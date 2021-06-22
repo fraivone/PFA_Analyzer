@@ -49,4 +49,4 @@ Additionally, further details will be saved in the sub-folder **./Plot/yyMMdd_hh
 
 ### Compatibility 
 Compatible with:
- 1. [MuonDPGNtuples 2021_MWGR4_v1](https://github.com/gmilella12/MuonDPGNTuples/releases) 
+1. Unfortunately at the moment this release is for testing purpose only

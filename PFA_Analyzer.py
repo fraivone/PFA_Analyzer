@@ -35,14 +35,14 @@ parser.set_defaults(rdphi_cut=0.15)
 args = parser.parse_args()
 
 
-stripGeometryDict = GetStripGeometry()
+
 ROOT.gROOT.SetBatch(True)
 contatore = 0
 
 start_time = time.time()
 
 
-files = files_in_folder("/eos/user/f/fivone/GEMNTuples/MWGR/2021/MWGR3/341343/")
+files = files_in_folder("/eos/user/f/fivone/GEMNTuples/MWGR/2021/MWGR4/342218_MEHits/")
 
 files = [f for f in files if ".root" in f]
 #files = ["/eos/user/f/fivone/GEMNTuples/MC/Output/Run3Summer19GS-step0/Zmumu/210517_065019/0000/"]
@@ -57,7 +57,11 @@ maxErrOnPropPhi = 0.01
 fiducialR = 1
 fiducialPhi = 0.005
 CutminPt = 0.
-maxSTA_NormChi2 = 9999999;
+maxSTA_NormChi2 = 9999999
+minME1Hit = 0
+minME2Hit = 0
+minME3Hit = 0
+minME4Hit = 0
 
 noisyEtaPID = []
 chambersOFF = ["GE11-P-14L1", "GE11-M-01L1", "GE11-M-11L1", "GE11-M-20L1", "GE11-M-34L1", "GE11-M-04L2", "GE11-M-11L2"]
@@ -103,7 +107,11 @@ TH1MetaData = { 'isFiducialCut':[],
                 'glb_phi':[],
                 'glb_rdphi':[],
                 'pt':[],
-                'STA_NormChi2':[]}
+                'STA_NormChi2':[],
+                'minME1Hit':[],
+                'minME2Hit':[],
+                'minME3Hit':[],
+                'minME4Hit':[]}
                 # ,
                 # 'loc_x':[]
                 # }
@@ -121,6 +129,10 @@ TH1MetaData['glb_phi'].Fill(ResidualCutOff['glb_phi'])
 TH1MetaData['glb_rdphi'].Fill(ResidualCutOff['glb_rdphi'])
 TH1MetaData['pt'].Fill(CutminPt)
 TH1MetaData['STA_NormChi2'].Fill(maxSTA_NormChi2)
+TH1MetaData['minME1Hit'].Fill(minME1Hit)
+TH1MetaData['minME2Hit'].Fill(minME2Hit)
+TH1MetaData['minME3Hit'].Fill(minME3Hit)
+TH1MetaData['minME4Hit'].Fill(minME4Hit)
 TH1MetaData['chamberOFFCanvas']=chamberOFFCanvas
 
 #TH1MetaData['loc_x'].Fill(ResidualCutOff['loc_x'])
@@ -224,6 +236,11 @@ THSanityChecks['Residual_Correlation']['glb_rdphi_dir_x'].GetXaxis().SetTitle("R
 THSanityChecks['Residual_Correlation']['glb_rdphi_dir_x'].GetYaxis().SetTitle("Dir_x (as Cos(#alpha) )")
 
 THSanityChecks['STA_Normchi2'] = ROOT.TH1F("STA_NormChi2","STA_NormChi2",200,0,20)
+THSanityChecks['nME1Hits'] = ROOT.TH1F("nME1Hits in STA","nME1Hits in STA",20,0,20)
+THSanityChecks['nME2Hits'] = ROOT.TH1F("nME2Hits in STA","nME2Hits in STA",20,0,20)
+THSanityChecks['nME3Hits'] = ROOT.TH1F("nME3Hits in STA","nME3Hits in STA",20,0,20)
+THSanityChecks['nME4Hits'] = ROOT.TH1F("nME4Hits in STA","nME4Hits in STA",20,0,20)
+THSanityChecks['nCSCHits'] = ROOT.TH1F("nCSCHits in STA","nCSCHits in STA",20,0,20)
 
 for key_1 in matching_variables:
     THSanityChecks['Occupancy'].setdefault(key_1,{'AfterMatching':{'Reco':ROOT.TH2F("RecoHitAfterMatching_"+key_1,"RecoHitAfterMatching_"+key_1,200,-300,300,200,-300,300),
@@ -267,12 +284,16 @@ for chain_index,evt in enumerate(chain):
     
     if chain_index % 40000 ==0:
         print round(float(chain_index)/float(chainEntries),3)*100,"%"
+
+    if chain_index > 100000:
+        break
+
     n_gemprop = len(evt.mu_propagated_chamber)
     n_gemrec = len(evt.gemRecHit_chamber)
     
     THSanityChecks['NHits']['BeforeMatching']['PerEVT']['Prop'].Fill(n_gemprop)
     THSanityChecks['NHits']['BeforeMatching']['PerEVT']['Reco'].Fill(n_gemrec)
-
+    
 
     ## Discard null entries
     if n_gemprop==0 or n_gemrec==0:
@@ -308,20 +329,22 @@ for chain_index,evt in enumerate(chain):
         ## Following command 
         # 1. init the key of dict with {'loc_x':[]}  if the key is not yet initialized
         # 2. append the value of local_x
-        RecHit_Dict.setdefault(RecHitEtaPartitionID, {'loc_x':[],'glb_x':[],'glb_y':[],'glb_z':[],'glb_r':[],'glb_phi':[]})
+        RecHit_Dict.setdefault(RecHitEtaPartitionID, {'loc_x':[],'glb_x':[],'glb_y':[],'glb_z':[],'glb_r':[],'glb_phi':[],'firstStrip':[],'cluster_size':[]})
         RecHit_Dict[RecHitEtaPartitionID]['loc_x'].append(evt.gemRecHit_loc_x[RecHit_index])
         RecHit_Dict[RecHitEtaPartitionID]['glb_x'].append(evt.gemRecHit_g_x[RecHit_index])
         RecHit_Dict[RecHitEtaPartitionID]['glb_y'].append(evt.gemRecHit_g_y[RecHit_index])
         RecHit_Dict[RecHitEtaPartitionID]['glb_z'].append(evt.gemRecHit_g_z[RecHit_index])
         RecHit_Dict[RecHitEtaPartitionID]['glb_r'].append(evt.gemRecHit_g_r[RecHit_index])
         RecHit_Dict[RecHitEtaPartitionID]['glb_phi'].append(evt.gemRecHit_g_phi[RecHit_index])
+        RecHit_Dict[RecHitEtaPartitionID]['firstStrip'].append(evt.gemRecHit_firstClusterStrip[RecHit_index])
+        RecHit_Dict[RecHitEtaPartitionID]['cluster_size'].append(evt.gemRecHit_cluster_size[RecHit_index])
 
         THSanityChecks['Occupancy']['BeforeMatching']['Reco'].Fill(evt.gemRecHit_g_x[RecHit_index],evt.gemRecHit_g_y[RecHit_index])
         THSanityChecks['Occupancy']['BeforeMatching'][endcapKey]['RecHits'].Fill(chamber,etaP)
         
-        strip = int(round((evt.gemRecHit_loc_x[RecHit_index]+abs(stripGeometryDict[chamber][etaP]['firstStrip']))/stripGeometryDict[chamber][etaP]['stripPitch'],0))
-        
-        THSanityChecks['RecHitperStrip'][endcapKey][chamber].Fill(strip,etaP)
+        for j in range(0,RecHit_Dict[RecHitEtaPartitionID]['cluster_size'][-1]):
+            strip = RecHit_Dict[RecHitEtaPartitionID]['firstStrip'][-1] + j
+            THSanityChecks['RecHitperStrip'][endcapKey][chamber].Fill(strip,etaP)
                     
 
         
@@ -349,7 +372,7 @@ for chain_index,evt in enumerate(chain):
 
         propHitFromME11 = bool(evt.mu_propagated_isME11[PropHit_index])
         if propHitFromME11:
-            PropHit_Dict.setdefault(PropHitChamberID,{'loc_x':[],'loc_y':[],'glb_x':[],'glb_y':[],'glb_z':[],'glb_r':[],'glb_phi':[],'pt':[],'etaP':[],'err_glb_r':[],'err_glb_phi':[],'Loc_dirX':[],'mu_propagated_isME11':[],'mu_propagated_EtaPartition_rMax':[],'mu_propagated_EtaPartition_rMin':[],'mu_propagated_isGEM':[],'mu_propagated_EtaPartition_phiMin':[],'mu_propagated_EtaPartition_phiMax':[],'STA_Normchi2':[]})    
+            PropHit_Dict.setdefault(PropHitChamberID,{'loc_x':[],'loc_y':[],'glb_x':[],'glb_y':[],'glb_z':[],'glb_r':[],'glb_phi':[],'pt':[],'etaP':[],'err_glb_r':[],'err_glb_phi':[],'Loc_dirX':[],'mu_propagated_isME11':[],'mu_propagated_EtaPartition_rMax':[],'mu_propagated_EtaPartition_rMin':[],'mu_propagated_isGEM':[],'mu_propagated_EtaPartition_phiMin':[],'mu_propagated_EtaPartition_phiMax':[],'STA_Normchi2':[],'nME1Hits':[],'nME2Hits':[],'nME3Hits':[],'nME4Hits':[]})    
             PropHit_Dict[PropHitChamberID]['loc_x'].append(evt.mu_propagatedLoc_x[PropHit_index])
             PropHit_Dict[PropHitChamberID]['loc_y'].append(evt.mu_propagatedLoc_y[PropHit_index])
             PropHit_Dict[PropHitChamberID]['glb_x'].append(evt.mu_propagatedGlb_x[PropHit_index])
@@ -368,7 +391,13 @@ for chain_index,evt in enumerate(chain):
             PropHit_Dict[PropHitChamberID]['mu_propagated_EtaPartition_rMin'].append(evt.mu_propagated_EtaPartition_rMin[PropHit_index])
             PropHit_Dict[PropHitChamberID]['mu_propagated_EtaPartition_phiMax'].append(evt.mu_propagated_EtaPartition_phiMax[PropHit_index])
             PropHit_Dict[PropHitChamberID]['mu_propagated_EtaPartition_phiMin'].append(evt.mu_propagated_EtaPartition_phiMin[PropHit_index])
-            PropHit_Dict[PropHitChamberID]['STA_Normchi2'].append(evt.mu_propagated_TrackNormChi2[PropHit_index])
+            PropHit_Dict[PropHitChamberID]['STA_Normchi2'].append(evt.mu_propagated_TrackNormChi2[PropHit_index])            
+            PropHit_Dict[PropHitChamberID]['nME1Hits'].append(evt.mu_propagated_nME1hits[PropHit_index])
+            PropHit_Dict[PropHitChamberID]['nME2Hits'].append(evt.mu_propagated_nME2hits[PropHit_index])
+            PropHit_Dict[PropHitChamberID]['nME3Hits'].append(evt.mu_propagated_nME3hits[PropHit_index])
+            PropHit_Dict[PropHitChamberID]['nME4Hits'].append(evt.mu_propagated_nME4hits[PropHit_index])
+            
+            
 
             THSanityChecks['Occupancy']['BeforeMatching']['Prop'].Fill(evt.mu_propagatedGlb_x[PropHit_index],evt.mu_propagatedGlb_y[PropHit_index])
             THSanityChecks['Occupancy']['BeforeMatching'][endcapKey]['PropHits'].Fill(chamber,etaP)
@@ -406,34 +435,46 @@ for chain_index,evt in enumerate(chain):
                 EfficiencyDictGlobal[mv][etaPartitionID].setdefault(pt,{'num':0,'den':0})
 
         isGoodTrack = []
-        ## Discarding non-fiducial STA propagation from computation
+        passedCutProp = {key:[] for key in PropHitonEta.keys()}
+        ## Applying cuts on the propagated tracks to be used
         for index in range(nPropHitsOnEtaID):
-            if fiducialCut and passCut(PropHitonEta,index,maxPropR_Err=maxErrOnPropR,maxPropPhi_Err=maxErrOnPropPhi,fiducialCutR=fiducialR,fiducialCutPhi=fiducialPhi,minPt=CutminPt,maxChi2=maxSTA_NormChi2) == False:
+            if fiducialCut and passCut(PropHitonEta,index,maxPropR_Err=maxErrOnPropR,maxPropPhi_Err=maxErrOnPropPhi,fiducialCutR=fiducialR,fiducialCutPhi=fiducialPhi,minPt=CutminPt,maxChi2=maxSTA_NormChi2,minME1Hit=minME1Hit,minME2Hit=minME2Hit,minME3Hit=minME3Hit,minME4Hit=minME4Hit) == False:
                 isGoodTrack.append(False)
             else:
                 EfficiencyDictGlobal['glb_phi'][etaPartitionID][pt_index(PropHitonEta['pt'][index])]['den'] += 1
                 EfficiencyDictGlobal['glb_rdphi'][etaPartitionID][pt_index(PropHitonEta['pt'][index])]['den'] += 1
                 # EfficiencyDictGlobal['loc_x'][etaPartitionID][pt_index(PropHitonEta['pt'][index])]['den'] += 1
                 isGoodTrack.append(True)
+                for key in PropHitonEta.keys():
+                    passedCutProp[key].append(PropHitonEta[key][index])
         
         #any is the logical or across all elements of a list
         if any(isGoodTrack) == False:
             #print "No good STA propagation for etaPartitionID =  ",etaPartitionID
             continue
     
-        
+
 
         if etaPartitionID not in RecHit_Dict:
-            #print "No propagated hits for rechit for etaPartitionID =  ",etaPartitionID
+            #print "No rechit in etaPartitionID =  ",etaPartitionID
             continue
         
 
-        
+        PropHitonEta = passedCutProp
+        nGoodPropagation = len(PropHitonEta['glb_phi'])        
         RecHitonEta = RecHit_Dict[etaPartitionID]
+
         THSanityChecks['NHits']['PerEVT_PerEtaPartitionID']['Reco'].Fill(len(RecHitonEta['glb_phi']))
-        for k in range(nPropHitsOnEtaID):
+
+        for k in range(nGoodPropagation):
             THSanityChecks['PropagationError']['glb_phi_error']['all'].Fill(PropHitonEta['err_glb_phi'][k])
             THSanityChecks['PropagationError']['glb_r_error']['all'].Fill(PropHitonEta['err_glb_r'][k])
+            THSanityChecks['nME1Hits'].Fill(PropHitonEta['nME1Hits'][k])
+            THSanityChecks['nME2Hits'].Fill(PropHitonEta['nME2Hits'][k])
+            THSanityChecks['nME3Hits'].Fill(PropHitonEta['nME3Hits'][k])
+            THSanityChecks['nME4Hits'].Fill(PropHitonEta['nME4Hits'][k])
+            THSanityChecks['nCSCHits'].Fill( PropHitonEta['nME1Hits'][k] + PropHitonEta['nME2Hits'][k] + PropHitonEta['nME3Hits'][k] + PropHitonEta['nME4Hits'][k] )
+
             if chamber%2 == 0:
                 THSanityChecks['PropagationError']['glb_phi_error']['long'].Fill(PropHitonEta['err_glb_phi'][k])
                 THSanityChecks['PropagationError']['glb_r_error']['long'].Fill(PropHitonEta['err_glb_r'][k])
@@ -639,6 +680,12 @@ writeToTFile(OutF,THSanityChecks['Residual_Correlation']['glb_phi_vs_glb_rdphi']
 # writeToTFile(OutF,THSanityChecks['Residual_Correlation']['glb_rdphi_vs_loc_x'],"SanityChecks/Residual_Correlation/")
 writeToTFile(OutF,THSanityChecks['Residual_Correlation']['glb_rdphi_dir_x'],"SanityChecks/Residual_Correlation/")
 writeToTFile(OutF,THSanityChecks['STA_Normchi2'],"SanityChecks/STA_NormChi2/")
+writeToTFile(OutF,THSanityChecks['nME1Hits'],"SanityChecks/HitsCSC/")
+writeToTFile(OutF,THSanityChecks['nME2Hits'],"SanityChecks/HitsCSC/")
+writeToTFile(OutF,THSanityChecks['nME3Hits'],"SanityChecks/HitsCSC/")
+writeToTFile(OutF,THSanityChecks['nME4Hits'],"SanityChecks/HitsCSC/")
+writeToTFile(OutF,THSanityChecks['nCSCHits'],"SanityChecks/HitsCSC/")
+
 
 
 
@@ -758,4 +805,3 @@ for matchingVar in ['glb_phi','glb_rdphi']:
 
     data = pd.DataFrame(tempList,columns=['chamberID',"region","chamber","layer","etaPartition","matchedRecHit","propHit"])
     data.to_csv('./Plot/'+timestamp+'/MatchingSummary_'+matchingVar+'.csv', index=False)
-

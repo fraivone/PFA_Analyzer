@@ -81,7 +81,7 @@ def fillPlot2DResidualContainer(TH2Fresidual_collector,matching_variables,nbins)
                         TH2Fresidual_collector[key_1][key_2][key_3]['TH2F'].SetBinContent(x_bin,y_bin,AVG_Residual)
     return TH2Fresidual_collector
 
-def passCut(PropHitonEta,prop_hit_index,maxPropR_Err=0.7,maxPropPhi_Err=0.001,fiducialCutR=0.5,fiducialCutPhi=0.002,minPt=0.,maxChi2=9999999):
+def passCut(PropHitonEta,prop_hit_index,maxPropR_Err=0.7,maxPropPhi_Err=0.001,fiducialCutR=0.5,fiducialCutPhi=0.002,minPt=0.,maxChi2=9999999,minME1Hit=0,minME2Hit=0,minME3Hit=0,minME4Hit=0):
     passedCut = True
     if PropHitonEta['err_glb_phi'][prop_hit_index] > maxPropPhi_Err:
         passedCut = False
@@ -90,6 +90,16 @@ def passCut(PropHitonEta,prop_hit_index,maxPropR_Err=0.7,maxPropPhi_Err=0.001,fi
 
     if PropHitonEta['STA_Normchi2'][prop_hit_index] > maxChi2 or PropHitonEta['STA_Normchi2'][prop_hit_index] < 0.7:
         passedCut = False
+
+    if PropHitonEta['nME1Hits'][prop_hit_index] < minME1Hit:
+        passedCut = False
+    if PropHitonEta['nME2Hits'][prop_hit_index] < minME2Hit:
+        passedCut = False
+    if PropHitonEta['nME3Hits'][prop_hit_index] < minME3Hit:
+        passedCut = False
+    if PropHitonEta['nME4Hits'][prop_hit_index] < minME4Hit:
+        passedCut = False
+
     
     PhiMin = PropHitonEta['mu_propagated_EtaPartition_phiMin'][prop_hit_index]
     PhiMax = PropHitonEta['mu_propagated_EtaPartition_phiMax'][prop_hit_index]
@@ -434,4 +444,3 @@ def printSummary(sourceDict,matching_variables,ResidualCutOff,matching_variable_
         except:
             print "WARNING"
         print "#############"
-
