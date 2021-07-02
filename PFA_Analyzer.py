@@ -12,15 +12,19 @@ import pandas as pd
 from argparse import RawTextHelpFormatter
 ### Let's add some more from different folder
 lib_folder = os.path.expandvars('$myLIB')
-sys.path.insert(1, lib_folder+'/ROOT_Utils/')
-sys.path.insert(2, lib_folder+'/GE11Geometry/')
+sys.path.insert(1, lib_folder)
 try:
     from ROOT_Utils import *
-    from PFA_Analyzer_Utils import *
+    
 
 except:
   print("ERROR:\n\tCan't find the package CMS_lumi and tdrstlye\n\tPlease verify that this file are placed in the path $myLIB/ROOT_Utils/ \n\tAdditionally keep in mind to export the environmental variable $myLIB\nEXITING...\n") 
   sys.exit(0)
+try:
+    from PFA_Analyzer_Utils import *
+except:
+    print "si strunz"
+    sys.exit(0)
 
 parser = argparse.ArgumentParser(
         description='''Scripts that: \n\t-Reads the GEMMuonNtuple\n\t-Plot Sanity Checks\n\t-Plot Residuals (takes the cut as parameter)\n\t-Plot efficiency\nCurrently allows the track matching on glb_phi and glb_rdphi''',
@@ -30,48 +34,60 @@ parser = argparse.ArgumentParser(
 
 parser.add_argument('-pc','--phi_cut', type=float,help="Maximum allowed dphi between RecoHit and PropHit to be counted as matched hit",required=False)
 parser.add_argument('-rdpc','--rdphi_cut', type=float,help="Maximum allowed rdphi between RecoHit and PropHit to be counted as matched hit",required=False)
+parser.add_argument('--chi2cut', type=float,help="Maximum normalized chi2 for which accept propagated tracks",required=False)
+parser.add_argument('--chamberOFF', type=str , help="file_path to the file containing a list of the chambers you want to exclude for the run (i.e. GE11-M-29L2)",required=False)
+parser.add_argument('--outputname', type=str, help="output file name",required=False)
+parser.add_argument('--fiducialR','-fR', type=float , help="fiducial cut along R axis",required=False)
+parser.add_argument('--fiducialPhi','-fP', type=float , help="fiducial cut along phi axis",required=False)
+
+parser.add_argument('--minME1', type=int, help="Min number of ME1 hits",required=False)
+parser.add_argument('--minME2', type=int, help="Min number of ME2 hits",required=False)
+parser.add_argument('--minME3', type=int, help="Min number of ME3 hits",required=False)
+parser.add_argument('--minME4', type=int, help="Min number of ME4 hits",required=False)
 parser.set_defaults(phi_cut=0.001)
 parser.set_defaults(rdphi_cut=0.15)
+parser.set_defaults(chi2cut=9999999)
+parser.set_defaults(minME1=0)
+parser.set_defaults(minME2=0)
+parser.set_defaults(minME3=0)
+parser.set_defaults(minME4=0)
+parser.set_defaults(fiducialR=1)
+parser.set_defaults(fiducialPhi=0.005)
 args = parser.parse_args()
 
 
 
 ROOT.gROOT.SetBatch(True)
-contatore = 0
+
 
 start_time = time.time()
 
-
 files = files_in_folder("/eos/user/f/fivone/GEMNTuples/MWGR/2021/MWGR4/342218_MEHits/")
-
 files = [f for f in files if ".root" in f]
-#files = ["/eos/user/f/fivone/GEMNTuples/MC/Output/Run3Summer19GS-step0/Zmumu/210517_065019/0000/"]
 
-matching_variables = ['glb_phi','glb_rdphi']#,'loc_x']
-matching_variable_units = {'glb_phi':'rad','glb_rdphi':'cm'}#,'loc_x':'cm'}
-ResidualCutOff= {'glb_phi':args.phi_cut,'glb_rdphi':args.rdphi_cut}#,'loc_x':.5}
+matching_variables = ['glb_phi','glb_rdphi']
+matching_variable_units = {'glb_phi':'rad','glb_rdphi':'cm'}
+ResidualCutOff= {'glb_phi':args.phi_cut,'glb_rdphi':args.rdphi_cut}
 
 fiducialCut = True
 maxErrOnPropR = 1
 maxErrOnPropPhi = 0.01
-fiducialR = 1
-fiducialPhi = 0.005
+fiducialR = args.fiducialR
+fiducialPhi = args.fiducialPhi
 CutminPt = 0.
-maxSTA_NormChi2 = 9999999
-minME1Hit = 0
-minME2Hit = 0
-minME3Hit = 0
-minME4Hit = 0
+maxSTA_NormChi2 = args.chi2cut
+minME1Hit = args.minME1
+minME2Hit = args.minME2
+minME3Hit = args.minME3
+minME4Hit = args.minME4
 
 noisyEtaPID = []
-chambersOFF = ["GE11-P-14L1", "GE11-M-01L1", "GE11-M-11L1", "GE11-M-20L1", "GE11-M-34L1", "GE11-M-04L2", "GE11-M-11L2"]
-chamberNumberOFF = [ chamberName2ReChLa(k) for k in chambersOFF]
+chamberNumberOFF = [] if args.chamberOFF is None else importOFFChamber(args.chamberOFF)
 
-ML1,ML2,PL1,PL2 = ChambersOFFHisto(chamberNumberOFF)
 chamberOFFCanvas = setUpCanvas("ExcludedChambers",1200,1200)
 chamberOFFCanvas.Divide(1,4)
 
-for counter,plot in enumerate([ML1,ML2,PL1,PL2]):
+for counter,plot in enumerate(ChambersOFFHisto(chamberNumberOFF)):
     chamberOFFCanvas.cd(counter+1)
     plot.Draw("")
 
@@ -84,8 +100,13 @@ TH2nbins = 200
 TH2min = -80
 
 EfficiencyDictGlobal = dict((m,{}) for m in matching_variables)
+EfficiencyDictDirection = dict((m,{}) for m in matching_variables)
 
 ## ROOT Object declaration
+test = ROOT.TH2F("DirX_CLS","DirX_CLS",40,-1,1,128,0,128)
+test.GetXaxis().SetTitle("dirX")
+test.GetYaxis().SetTitle("CLS")
+
 TH1Fresidual_collector = {}
 TH2Fresidual_collector = generate2DResidualContainer(matching_variables,TH2nbins,TH2min)  
 THSanityChecks = {'Occupancy':{}, 
@@ -107,14 +128,12 @@ TH1MetaData = { 'isFiducialCut':[],
                 'glb_phi':[],
                 'glb_rdphi':[],
                 'pt':[],
-                'STA_NormChi2':[],
+                'maxSTA_NormChi2':[],
                 'minME1Hit':[],
                 'minME2Hit':[],
                 'minME3Hit':[],
                 'minME4Hit':[]}
-                # ,
-                # 'loc_x':[]
-                # }
+
 ## Initialize Collectors
 
 for key in TH1MetaData.keys():
@@ -128,14 +147,13 @@ TH1MetaData['fiucialPhi'].Fill(fiducialPhi)
 TH1MetaData['glb_phi'].Fill(ResidualCutOff['glb_phi'])
 TH1MetaData['glb_rdphi'].Fill(ResidualCutOff['glb_rdphi'])
 TH1MetaData['pt'].Fill(CutminPt)
-TH1MetaData['STA_NormChi2'].Fill(maxSTA_NormChi2)
+TH1MetaData['maxSTA_NormChi2'].Fill(maxSTA_NormChi2)
 TH1MetaData['minME1Hit'].Fill(minME1Hit)
 TH1MetaData['minME2Hit'].Fill(minME2Hit)
 TH1MetaData['minME3Hit'].Fill(minME3Hit)
 TH1MetaData['minME4Hit'].Fill(minME4Hit)
 TH1MetaData['chamberOFFCanvas']=chamberOFFCanvas
 
-#TH1MetaData['loc_x'].Fill(ResidualCutOff['loc_x'])
 
 
 
@@ -219,18 +237,9 @@ THSanityChecks['etaP_vs_pt'].GetYaxis().SetTitle("pt (GeV)")
 THSanityChecks['etaP_vs_pt'].SetStats(0)
 
 THSanityChecks['Residual_Correlation']['glb_phi_vs_glb_rdphi'] = ROOT.TH2F("Residual_Correlation #Delta#phi vs R#Delta#phi","Residual_Correlation #Delta#phi vs R#Delta#phi",100,-3*ResidualCutOff['glb_phi'],3*ResidualCutOff['glb_phi'],100,-3*ResidualCutOff['glb_rdphi'],3*ResidualCutOff['glb_rdphi'])
-#THSanityChecks['Residual_Correlation']['glb_phi_vs_loc_x'] = ROOT.TH2F("Residual_Correlation #Delta#phi vs Loc_x","Residual_Correlation #Delta#phi vs Loc_x",100,-3*ResidualCutOff['glb_phi'],3*ResidualCutOff['glb_phi'],100,-3*ResidualCutOff['loc_x'],3*ResidualCutOff['loc_x'])
-#THSanityChecks['Residual_Correlation']['glb_rdphi_vs_loc_x'] = ROOT.TH2F("Residual_Correlation R#Delta#phi vs Loc_x","Residual_Correlation R#Delta#phi vs Loc_x",100,-3*ResidualCutOff['glb_rdphi'],3*ResidualCutOff['glb_rdphi'],100,-3*ResidualCutOff['loc_x'],3*ResidualCutOff['loc_x'])
 THSanityChecks['Residual_Correlation']['glb_rdphi_dir_x'] = ROOT.TH2F("Residual_Correlation R#Delta#phi vs Dir_x","Residual_Correlation R#Delta#phi vs Dir_x",100,-3*ResidualCutOff['glb_rdphi'],3*ResidualCutOff['glb_rdphi'],100,0,3.1415)
 THSanityChecks['Residual_Correlation']['glb_phi_vs_glb_rdphi'].GetXaxis().SetTitle("#Delta#phi (rad)")
 THSanityChecks['Residual_Correlation']['glb_phi_vs_glb_rdphi'].GetYaxis().SetTitle("R#Delta#phi (cm)")
-# THSanityChecks['Residual_Correlation']['glb_phi_vs_loc_x'].SetStats(0)
-# THSanityChecks['Residual_Correlation']['glb_phi_vs_loc_x'].GetXaxis().SetTitle("#Delta#phi (rad)")
-# THSanityChecks['Residual_Correlation']['glb_phi_vs_loc_x'].GetYaxis().SetTitle("Loc_x (cm)")
-# THSanityChecks['Residual_Correlation']['glb_phi_vs_loc_x'].SetStats(0)
-# THSanityChecks['Residual_Correlation']['glb_rdphi_vs_loc_x'].GetXaxis().SetTitle("R#Delta#phi (cm)")
-# THSanityChecks['Residual_Correlation']['glb_rdphi_vs_loc_x'].GetYaxis().SetTitle("Loc_x (cm)")
-# THSanityChecks['Residual_Correlation']['glb_rdphi_vs_loc_x'].SetStats(0)
 THSanityChecks['Residual_Correlation']['glb_rdphi_dir_x'].SetStats(0)
 THSanityChecks['Residual_Correlation']['glb_rdphi_dir_x'].GetXaxis().SetTitle("R#Delta#phi (cm)")
 THSanityChecks['Residual_Correlation']['glb_rdphi_dir_x'].GetYaxis().SetTitle("Dir_x (as Cos(#alpha) )")
@@ -240,7 +249,7 @@ THSanityChecks['nME1Hits'] = ROOT.TH1F("nME1Hits in STA","nME1Hits in STA",20,0,
 THSanityChecks['nME2Hits'] = ROOT.TH1F("nME2Hits in STA","nME2Hits in STA",20,0,20)
 THSanityChecks['nME3Hits'] = ROOT.TH1F("nME3Hits in STA","nME3Hits in STA",20,0,20)
 THSanityChecks['nME4Hits'] = ROOT.TH1F("nME4Hits in STA","nME4Hits in STA",20,0,20)
-THSanityChecks['nCSCHits'] = ROOT.TH1F("nCSCHits in STA","nCSCHits in STA",20,0,20)
+THSanityChecks['nCSCHits'] = ROOT.TH1F("nCSCHits in STA","nCSCHits in STA",40,0,40)
 
 for key_1 in matching_variables:
     THSanityChecks['Occupancy'].setdefault(key_1,{'AfterMatching':{'Reco':ROOT.TH2F("RecoHitAfterMatching_"+key_1,"RecoHitAfterMatching_"+key_1,200,-300,300,200,-300,300),
@@ -285,8 +294,6 @@ for chain_index,evt in enumerate(chain):
     if chain_index % 40000 ==0:
         print round(float(chain_index)/float(chainEntries),3)*100,"%"
 
-    if chain_index > 100000:
-        break
 
     n_gemprop = len(evt.mu_propagated_chamber)
     n_gemrec = len(evt.gemRecHit_chamber)
@@ -326,9 +333,7 @@ for chain_index,evt in enumerate(chain):
         if [region,chamber,layer] in chamberNumberOFF:
             continue
 
-        ## Following command 
-        # 1. init the key of dict with {'loc_x':[]}  if the key is not yet initialized
-        # 2. append the value of local_x
+
         RecHit_Dict.setdefault(RecHitEtaPartitionID, {'loc_x':[],'glb_x':[],'glb_y':[],'glb_z':[],'glb_r':[],'glb_phi':[],'firstStrip':[],'cluster_size':[]})
         RecHit_Dict[RecHitEtaPartitionID]['loc_x'].append(evt.gemRecHit_loc_x[RecHit_index])
         RecHit_Dict[RecHitEtaPartitionID]['glb_x'].append(evt.gemRecHit_g_x[RecHit_index])
@@ -372,7 +377,7 @@ for chain_index,evt in enumerate(chain):
 
         propHitFromME11 = bool(evt.mu_propagated_isME11[PropHit_index])
         if propHitFromME11:
-            PropHit_Dict.setdefault(PropHitChamberID,{'loc_x':[],'loc_y':[],'glb_x':[],'glb_y':[],'glb_z':[],'glb_r':[],'glb_phi':[],'pt':[],'etaP':[],'err_glb_r':[],'err_glb_phi':[],'Loc_dirX':[],'mu_propagated_isME11':[],'mu_propagated_EtaPartition_rMax':[],'mu_propagated_EtaPartition_rMin':[],'mu_propagated_isGEM':[],'mu_propagated_EtaPartition_phiMin':[],'mu_propagated_EtaPartition_phiMax':[],'STA_Normchi2':[],'nME1Hits':[],'nME2Hits':[],'nME3Hits':[],'nME4Hits':[]})    
+            PropHit_Dict.setdefault(PropHitChamberID,{'loc_x':[],'loc_y':[],'glb_x':[],'glb_y':[],'glb_z':[],'glb_r':[],'glb_phi':[],'pt':[],'etaP':[],'err_glb_r':[],'err_glb_phi':[],'Loc_dirX':[],'Loc_dirY':[],'Loc_dirZ':[],'mu_propagated_isME11':[],'mu_propagated_EtaPartition_rMax':[],'mu_propagated_EtaPartition_rMin':[],'mu_propagated_isGEM':[],'mu_propagated_EtaPartition_phiMin':[],'mu_propagated_EtaPartition_phiMax':[],'STA_Normchi2':[],'nME1Hits':[],'nME2Hits':[],'nME3Hits':[],'nME4Hits':[]})    
             PropHit_Dict[PropHitChamberID]['loc_x'].append(evt.mu_propagatedLoc_x[PropHit_index])
             PropHit_Dict[PropHitChamberID]['loc_y'].append(evt.mu_propagatedLoc_y[PropHit_index])
             PropHit_Dict[PropHitChamberID]['glb_x'].append(evt.mu_propagatedGlb_x[PropHit_index])
@@ -383,6 +388,8 @@ for chain_index,evt in enumerate(chain):
             PropHit_Dict[PropHitChamberID]['err_glb_r'].append(evt.mu_propagatedGlb_errR[PropHit_index])
             PropHit_Dict[PropHitChamberID]['err_glb_phi'].append(evt.mu_propagatedGlb_errPhi[PropHit_index])
             PropHit_Dict[PropHitChamberID]['Loc_dirX'].append(evt.mu_propagatedLoc_dirX[PropHit_index])
+            PropHit_Dict[PropHitChamberID]['Loc_dirY'].append(evt.mu_propagatedLoc_dirY[PropHit_index])
+            PropHit_Dict[PropHitChamberID]['Loc_dirZ'].append(evt.mu_propagatedLoc_dirZ[PropHit_index])
             PropHit_Dict[PropHitChamberID]['pt'].append(evt.mu_propagated_pt[PropHit_index])
             PropHit_Dict[PropHitChamberID]['etaP'].append(etaP)
             PropHit_Dict[PropHitChamberID]['mu_propagated_isME11'].append(evt.mu_propagated_isME11[PropHit_index])
@@ -426,13 +433,16 @@ for chain_index,evt in enumerate(chain):
 
         nPropHitsOnEtaID = len(PropHitonEta['glb_phi'])
         THSanityChecks['NHits']['PerEVT_PerEtaPartitionID']['Prop'].Fill(nPropHitsOnEtaID)
-        
-        
+        cos_of_alpha_list = [np.sqrt(PropHitonEta['Loc_dirX'][i]**2 + PropHitonEta['Loc_dirY'][i]**2) for i in range(nPropHitsOnEtaID)]        
+
         ## Defining Efficiency dict global: [matchingVar][etaPartitionID][pt]
         for mv in matching_variables:
             EfficiencyDictGlobal[mv].setdefault(etaPartitionID,{})
+            EfficiencyDictDirection[mv].setdefault(etaPartitionID,{})
             for pt in range(0,11):
                 EfficiencyDictGlobal[mv][etaPartitionID].setdefault(pt,{'num':0,'den':0})
+            for j in range(0,10):
+                EfficiencyDictDirection[mv][etaPartitionID].setdefault(j,{'num':0,'den':0})
 
         isGoodTrack = []
         passedCutProp = {key:[] for key in PropHitonEta.keys()}
@@ -443,7 +453,11 @@ for chain_index,evt in enumerate(chain):
             else:
                 EfficiencyDictGlobal['glb_phi'][etaPartitionID][pt_index(PropHitonEta['pt'][index])]['den'] += 1
                 EfficiencyDictGlobal['glb_rdphi'][etaPartitionID][pt_index(PropHitonEta['pt'][index])]['den'] += 1
-                # EfficiencyDictGlobal['loc_x'][etaPartitionID][pt_index(PropHitonEta['pt'][index])]['den'] += 1
+
+                angle_index = int ( (cos_of_alpha_list[index] * 10 ) )
+                EfficiencyDictDirection['glb_phi'][etaPartitionID][angle_index]['den'] += 1 
+                EfficiencyDictDirection['glb_rdphi'][etaPartitionID][angle_index]['den'] += 1 
+
                 isGoodTrack.append(True)
                 for key in PropHitonEta.keys():
                     passedCutProp[key].append(PropHitonEta[key][index])
@@ -535,21 +549,18 @@ for chain_index,evt in enumerate(chain):
 
             if matchingVar == 'glb_phi':
                 THSanityChecks['Residual_Correlation']['glb_phi_vs_glb_rdphi'].Fill(glb_phi_residual,glb_rdphi_residual)
-                # THSanityChecks['Residual_Correlation']['glb_phi_vs_loc_x'].Fill(glb_phi_residual,loc_x_residual)
-                # THSanityChecks['Residual_Correlation']['glb_rdphi_vs_loc_x'].Fill(glb_rdphi_residual,loc_x_residual)
+
                 THSanityChecks['Residual_Correlation']['glb_rdphi_dir_x'].Fill(glb_rdphi_residual,np.arccos(PropHitonEta['Loc_dirX'][prop_hit_index]))
 
             
-            # CUT
-
-            # if fiducialCut and passCut(PropHitonEta,prop_hit_index,maxPropR_Err=maxErrOnPropR,maxPropPhi_Err=maxErrOnPropPhi,fiducialCutR=fiducialR,fiducialCutPhi=fiducialPhi) == False:
-            #     continue
-            # EfficiencyDictGlobal[matchingVar][etaPartitionID][pt_index(PropHitonEta['pt'][prop_hit_index])]['den'] += 1
 
             if abs(min_residual) < ResidualCutOff[matchingVar]:
 
+                
                 EfficiencyDictGlobal[matchingVar][etaPartitionID][pt_index(PropHitonEta['pt'][prop_hit_index])]['num'] += 1
-                                
+                angle_index = int( cos_of_alpha_list[prop_hit_index] * 10)
+                EfficiencyDictDirection[matchingVar][etaPartitionID][angle_index]['num'] += 1
+
                 TH1Fresidual_collector[matchingVar]['all']['glb_phi'].Fill(glb_phi_residual)
                 TH1Fresidual_collector[matchingVar]['all']['glb_rdphi'].Fill(glb_rdphi_residual)
 
@@ -600,6 +611,7 @@ for chain_index,evt in enumerate(chain):
                 if matchingVar == 'glb_rdphi':
                     endcap = "M" if region == -1 else "P"
                     TH1Fresidual_collector[matchingVar][endcap+"L"+str(layer)][chamber].Fill(glb_rdphi_residual)
+                    test.Fill(PropHitonEta['Loc_dirX'][prop_hit_index],RecHitonEta['cluster_size'][reco_hit_index])
                     
             else:
                 pass
@@ -620,15 +632,19 @@ TH2Fresidual_collector = fillPlot2DResidualContainer(TH2Fresidual_collector,matc
 print("--- %s seconds ---" % (time.time() - start_time))
 
 
+
 ## Storing the results
 
-timestamp =  time.strftime("%-y%m%d_%H%M")
+timestamp =  time.strftime("%-y%m%d_%H%M") if args.outputname is None else args.outputname
 subprocess.call(["mkdir", "-p", "./Plot/"+timestamp+"/"+"glb_phi/"])
 subprocess.call(["mkdir", "-p", "./Plot/"+timestamp+"/"+"glb_rdphi/"])
 
 
 
-OutF = ROOT.TFile("./PFA_Output_"+timestamp+".root","RECREATE")
+OutF = ROOT.TFile("./"+timestamp+".root","RECREATE")
+
+writeToTFile(OutF,test,"SanityChecks/AngleDirCorrelation/")
+
 writeToTFile(OutF,THSanityChecks['NHits']['BeforeMatching']['PerEVT']['Reco'],"SanityChecks/NHits/BeforeMatching/")
 writeToTFile(OutF,THSanityChecks['NHits']['BeforeMatching']['PerEVT']['Prop'],"SanityChecks/NHits/BeforeMatching/")
 
@@ -676,8 +692,6 @@ writeToTFile(OutF,THSanityChecks['PropagationError']['glb_r_error']['short_noGEM
 writeToTFile(OutF,THSanityChecks['etaP_vs_pt'],"SanityChecks/etaP_vs_pt/")
 
 writeToTFile(OutF,THSanityChecks['Residual_Correlation']['glb_phi_vs_glb_rdphi'],"SanityChecks/Residual_Correlation/")
-# writeToTFile(OutF,THSanityChecks['Residual_Correlation']['glb_phi_vs_loc_x'],"SanityChecks/Residual_Correlation/")
-# writeToTFile(OutF,THSanityChecks['Residual_Correlation']['glb_rdphi_vs_loc_x'],"SanityChecks/Residual_Correlation/")
 writeToTFile(OutF,THSanityChecks['Residual_Correlation']['glb_rdphi_dir_x'],"SanityChecks/Residual_Correlation/")
 writeToTFile(OutF,THSanityChecks['STA_Normchi2'],"SanityChecks/STA_NormChi2/")
 writeToTFile(OutF,THSanityChecks['nME1Hits'],"SanityChecks/HitsCSC/")
@@ -709,6 +723,11 @@ for matchingVar in matching_variables:
     EffiDistrAll = generateEfficiencyDistribution(EfficiencyDictGlobal[matchingVar])
     GE11efficiencyByEta_Short,GE11efficiencyByEta_Long,GE11efficiencyByEta_All = generateEfficiencyPlotbyEta(EfficiencyDictGlobal[matchingVar],[1,-1],[1,2])
     GE11efficiencyByPt_Short,GE11efficiencyByPt_Long,GE11efficiencyByPt_All = generateEfficiencyPlotbyPt(EfficiencyDictGlobal[matchingVar])
+    num_angle,den_angle,angle_vs_eff = incidenceAngle_vs_Eff(EfficiencyDictDirection[matchingVar],[-1,1],[1,2])
+
+    writeToTFile(OutF,den_angle,"Efficiency/"+matchingVar+"/Angle/")
+    writeToTFile(OutF,num_angle,"Efficiency/"+matchingVar+"/Angle/")
+    writeToTFile(OutF,angle_vs_eff,"Efficiency/"+matchingVar+"/Angle/")
 
     writeToTFile(OutF,efficiency2DPlotAll,"Efficiency/"+matchingVar+"/2DView/")
     writeToTFile(OutF,Num2DAll,"Efficiency/"+matchingVar+"/2DView/")

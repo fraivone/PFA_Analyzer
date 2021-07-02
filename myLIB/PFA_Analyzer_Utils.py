@@ -2,6 +2,7 @@ import ROOT
 import numpy
 import pandas as pd
 from ROOT_Utils import *
+import sys
 
 
 
@@ -11,6 +12,24 @@ def getInfoFromEtaID(id):
     chamber = (abs(id)-etaPartition-10*layer)/100
     region = id/abs(id)
     return region,chamber,layer,etaPartition
+
+## Expects to have a file with list of "GE11-M-22L2" to be excluded
+def importOFFChamber(file_path):
+    try:
+        with open(file_path, "r") as my_file:
+            content = my_file.read()
+            chamber_OFF_list = content.split("\n")
+            chamber_OFF_list.remove('')
+            try:
+                chamberNumberOFF = [ chamberName2ReChLa(k) for k in chamber_OFF_list]
+            except:
+                print "Error in the formatting of Chamber names in the file " + file_path+"\nExiting .."
+                sys.exit(0)
+    except IOError:
+        print "Couldn't open file : "+file_path+"\nExiting .."
+        sys.exit(0)
+    
+    return chamberNumberOFF
 
 def chamberName2ReChLa(chamberName):
     re = -1 if "M" in chamberName else 1
@@ -44,6 +63,41 @@ def ChambersOFFHisto(chamberNumberOFF):
             GE11_OFF[key_1][key_2].SetStats(False)
 
     return GE11_OFF[-1][1],GE11_OFF[-1][2],GE11_OFF[1][1],GE11_OFF[1][2]
+
+def incidenceAngle_vs_Eff(sourceDict,input_region=1,input_layer=1):
+    ## Transforming in list
+    reg_tag_string = "All" if isinstance(input_region, list) else "P" if input_region == 1 else "M"
+    lay_tag_string = "" if isinstance(input_layer, list) else "L1" if input_layer == 1 else "L2"
+    input_region = [input_region] if not isinstance(input_region, list) else input_region
+    input_layer = [input_layer] if not isinstance(input_layer, list) else input_layer
+
+    title = "GE11"+reg_tag_string+lay_tag_string
+    angle_nbins,angle_min,angle_max = 10,0,1.
+    eff_nbins, eff_min,eff_max = 40, 0.0, 1.2
+
+    Eff_Plot = ROOT.TGraphAsymmErrors(title+"_incidenceAngle_Eff",title+"_incidenceAngle_Eff")
+    NumTH1F = ROOT.TH1F(title+"_incidenceAngle_Num",title+"_incidenceAngle_Num",angle_nbins,angle_min,angle_max)
+    DenTH1F = ROOT.TH1F(title+"_incidenceAngle_Den",title+"_incidenceAngle_Den",angle_nbins,angle_min,angle_max)
+        
+
+    for j in range(0,10):
+        etaPartitionRecHits = 0
+        etaPartitionPropHits = 0
+        for etaPartitionID,value in sourceDict.items():
+            region,chamber,layer,eta = getInfoFromEtaID(etaPartitionID)
+            
+            if layer not in input_layer or region not in input_region:
+                continue
+
+            etaPartitionRecHits  += value[j]['num']
+            etaPartitionPropHits += value[j]['den']
+        NumTH1F.SetBinContent((j+1),etaPartitionRecHits)
+        DenTH1F.SetBinContent((j+1),etaPartitionPropHits)
+    
+    Eff_Plot.Divide(NumTH1F,DenTH1F)
+    return NumTH1F, DenTH1F, Eff_Plot
+
+
 
 ## Structure:: TH2Fresidual_collector[matchingvar][chambers][residual_of_what][Plot] == Contains the TH2F
 ## Structure:: TH2Fresidual_collector[matchingvar][chambers][residual_of_what][binx][biny] == list(n entries, sum(abs(residual)))
@@ -88,7 +142,7 @@ def passCut(PropHitonEta,prop_hit_index,maxPropR_Err=0.7,maxPropPhi_Err=0.001,fi
     if PropHitonEta['err_glb_r'][prop_hit_index] > maxPropR_Err:
         passedCut = False
 
-    if PropHitonEta['STA_Normchi2'][prop_hit_index] > maxChi2 or PropHitonEta['STA_Normchi2'][prop_hit_index] < 0.7:
+    if PropHitonEta['STA_Normchi2'][prop_hit_index] > maxChi2 or PropHitonEta['STA_Normchi2'][prop_hit_index] < 0.5:
         passedCut = False
 
     if PropHitonEta['nME1Hits'][prop_hit_index] < minME1Hit:
