@@ -35,14 +35,16 @@ The output data are always divided in 2 independent branches, named accordingly.
 
 More info on the Analysis workflow --> [MWGR4 PFA Report](https://indico.cern.ch/event/1048923/contributions/4406801/attachments/2264472/3844543/PFA_FIvone_MWGR4_v1.pdf#page=33)
 
-#### Special Feature: Double Layer Efficiency (DLE)
+### Special Feature: Double Layer Efficiency (DLE)
 DLE stands for double layer efficiency. In short, this method adds a tighter selection criteria on STA tracks to be used for efficiency evaluation.
 * Consider only STA tracks with 2 PropHits, 1 for each layer of the same SC
-* For efficiency on L1(2) consider only STA tracks with matched RecHitin L2(1
+* For efficiency on L1(2) consider only STA tracks with matched RecHitin L2(1)
 
 When the boolean option DLE is provided, the analysis will produce an additional set of plots under "Efficiency/DLE".
+
 **Why do I care?**
-When the option DLE is selected, the efficiency is still evaluated in the classical way. However only STA tracks with 2 PropHits, 1 for each layer of the same SC are considered (lowers down statistics)
+
+When the option DLE is selected, the efficiency is still evaluated in the classical way. However only STA tracks with 2 PropHits, 1 for each layer of the same SC are considered. So you do care because it lowers down the statistics.
 
 ### Output
 The output file is named based on the outputname provided as input. If no outputname was provided the analysis date will be used:

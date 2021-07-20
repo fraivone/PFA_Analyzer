@@ -72,8 +72,8 @@ ResidualCutOff= {'glb_phi':args.phi_cut,'glb_rdphi':args.rdphi_cut}
 
 DLE = args.DLE
 fiducialCut = True
-maxErrOnPropR = 100
-maxErrOnPropPhi = 100
+maxErrOnPropR = 1
+maxErrOnPropPhi = 0.01
 fiducialR = args.fiducialR
 fiducialPhi = args.fiducialPhi
 CutminPt = 0.
@@ -298,6 +298,8 @@ for chain_index,evt in enumerate(chain):
     
     if chain_index % 40000 ==0:
         print round(float(chain_index)/float(chainEntries),3)*100,"%"
+    if chain_index == 80000:
+        break
 
 
     n_gemprop = len(evt.mu_propagated_chamber)
@@ -854,6 +856,9 @@ for matchingVar in matching_variables:
                 writeToTFile(OutF,DLE_Num2D,"Efficiency/DLE/2DView/"+reg_tag_string+lay_tag_string+"/")
                 writeToTFile(OutF,DLE_Den2D,"Efficiency/DLE/2DView/"+reg_tag_string+lay_tag_string+"/")
                 writeToTFile(OutF,DLE_Summary,"Efficiency/DLE/"+reg_tag_string+lay_tag_string+"/")
+                writeToTFile(OutF,DLE_ByEta_Short,"Efficiency/DLE/ByEta/"+reg_tag_string+lay_tag_string+"/")
+                writeToTFile(OutF,DLE_ByEta_Long,"Efficiency/DLE/ByEta/"+reg_tag_string+lay_tag_string+"/")
+                writeToTFile(OutF,DLE_ByEta_All,"Efficiency/DLE/ByEta/"+reg_tag_string+lay_tag_string+"/")
             
             
             c1.cd()
@@ -882,10 +887,6 @@ for matchingVar in matching_variables:
             writeToTFile(OutF,efficiencyByEta_Short,"Efficiency/"+matchingVar+"/ByEta/"+reg_tag_string+lay_tag_string+"/")
             writeToTFile(OutF,efficiencyByEta_Long,"Efficiency/"+matchingVar+"/ByEta/"+reg_tag_string+lay_tag_string+"/")
             writeToTFile(OutF,efficiencyByEta_All,"Efficiency/"+matchingVar+"/ByEta/"+reg_tag_string+lay_tag_string+"/")
-
-            writeToTFile(OutF,DLE_ByEta_Short,"Efficiency/DLE/ByEta/"+reg_tag_string+lay_tag_string+"/")
-            writeToTFile(OutF,DLE_ByEta_Long,"Efficiency/DLE/ByEta/"+reg_tag_string+lay_tag_string+"/")
-            writeToTFile(OutF,DLE_ByEta_All,"Efficiency/DLE/ByEta/"+reg_tag_string+lay_tag_string+"/")
 
 
 
