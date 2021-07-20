@@ -14,14 +14,13 @@ source setup.sh
 Let s suppose you have a bunch of  [compatible](#Compatibility) NTuples stored in the folder */A/B/C/*
 
 1. Change the line containing `files = files_in_folder("<>") ` in `files = files_in_folder("/A/B/C/")`
-1. Change the line  `chambersOFF = ["GE11-P-14L1", "GE11-M-20L1"] ` with the list of  chambers you want to exclude from the analysis, mantaining the same naming convention
 1. Run  ``` python PFA_Analyzer.py -pc 0.01 -rdpc 4```
 
 where
 * pc = "φ cut" max angular distance (in rad) between RecHit and PropHit  to allow matching
 * rdpc = "RΔφ cut" max distance (in cm) between RecHit and PropHit  to allow matching
 
-Other 2nd order parameter as the fiducial cuts, propagation error cuts, muon pt cut  can be adjusted by direct editing of the PFA_Analyzer.py file.
+Many other options can be provided as input (e.g STA chi2 cut, output name, fiducial cuts and etc...). You are encouraged to have a look at them `python PFA_Analyzer.py --help`
 
 ### Nuts and bolts
 1. Runs through all the events included in the source NTuples
@@ -36,17 +35,28 @@ The output data are always divided in 2 independent branches, named accordingly.
 
 More info on the Analysis workflow --> [MWGR4 PFA Report](https://indico.cern.ch/event/1048923/contributions/4406801/attachments/2264472/3844543/PFA_FIvone_MWGR4_v1.pdf#page=33)
 
+#### Special Feature: Double Layer Efficiency (DLE)
+DLE stands for double layer efficiency. In short, this method adds a tighter selection criteria on STA tracks to be used for efficiency evaluation.
+* Consider only STA tracks with 2 PropHits, 1 for each layer of the same SC
+* For efficiency on L1(2) consider only STA tracks with matched RecHitin L2(1
+
+When the boolean option DLE is provided, the analysis will produce an additional set of plots under "Efficiency/DLE".
+**Why do I care?**
+When the option DLE is selected, the efficiency is still evaluated in the classical way. However only STA tracks with 2 PropHits, 1 for each layer of the same SC are considered (lowers down statistics)
 
 ### Output
-The output will be stored in the root file named:
+The output file is named based on the outputname provided as input. If no outputname was provided the analysis date will be used:
 ```
-PFA_Output_yyMMdd_hhmm.root
+outputname.root // yyMMdd_hhmm.root
 ```
-Additionally, further details will be saved in the sub-folder **./Plot/yyMMdd_hhmm/**:
+where outputname 
+Additionally, further details will be saved in the sub-folder **./Plot/outputname/** // **./Plot/yyMMdd_hhmm/**:
 
 * Two csv files, containing the number of RecHit and PropHit for each unique etaP analyzed; one for glb_phi and one for RΔφ
 * Two subfolders containing the most relevant plots as pdf, one for glb_phi and one for glb_rdphi
 
 ### Compatibility 
-Compatible with:
-1. Unfortunately at the moment this release is for testing purpose only
+Compatible with GEM Common Ntuples produced with the release 
+```
+2021_MWGR4_v2
+```

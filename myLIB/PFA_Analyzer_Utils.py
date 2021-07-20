@@ -19,7 +19,10 @@ def importOFFChamber(file_path):
         with open(file_path, "r") as my_file:
             content = my_file.read()
             chamber_OFF_list = content.split("\n")
-            chamber_OFF_list.remove('')
+            try: ## Will remove 1 empty entry from the list, if any
+                chamber_OFF_list.remove('')
+            except:
+                pass
             try:
                 chamberNumberOFF = [ chamberName2ReChLa(k) for k in chamber_OFF_list]
             except:
@@ -182,7 +185,7 @@ def passCut(PropHitonEta,prop_hit_index,maxPropR_Err=0.7,maxPropPhi_Err=0.001,fi
     if PropHitonEta['glb_r'][prop_hit_index] > (PropHitonEta['mu_propagated_EtaPartition_rMax'][prop_hit_index]-fiducialCutR):
         passedCut = False
     if PropHitonEta['glb_r'][prop_hit_index] < (PropHitonEta['mu_propagated_EtaPartition_rMin'][prop_hit_index]+fiducialCutR):
-        passedCut = False    
+        passedCut = False
     return passedCut
 
 ## Generate confidence level limits for value obtained from ratio of Poissonian
@@ -400,6 +403,7 @@ def generateEfficiencyPlot2DGE11(sourceDict,input_region=1,input_layer=1):
 
     EfficiencyTH2D = NumTH2D.Clone()
     EfficiencyTH2D.SetTitle(title+"_ChambersEfficiency")
+    EfficiencyTH2D.SetName(title+"_ChambersEfficiency")
     EfficiencyTH2D.Divide(DenTH2D)
     for x in range(1,phi_nbins+1):
         for y in range(1,etaP_nbins+1):
@@ -489,7 +493,10 @@ def printSummary(sourceDict,matching_variables,ResidualCutOff,matching_variable_
         for eta in range(1,9):
             num = sum([sourceDict[matching_variable][key][k]['num'] for key in sourceDict[matching_variable].keys() for k in range(0,11) if abs(key)%10 == eta])
             den = sum([sourceDict[matching_variable][key][k]['den'] for key in sourceDict[matching_variable].keys() for k in range(0,11) if abs(key)%10 == eta])
-            print "Efficiency GE11 ETA"+str(eta)+"  ==> ", num , "/",den, " = ", float(num)/float(den)
+            try:
+                print "Efficiency GE11 ETA"+str(eta)+"  ==> ", num , "/",den, " = ", float(num)/float(den)
+            except:
+                print "EtaP = ",str(eta)," has no propagated hits..."
 
         num = sum([sourceDict[matching_variable][key][k]['num'] for key in sourceDict[matching_variable].keys() for k in range(0,11)])
         den = sum([sourceDict[matching_variable][key][k]['den'] for key in sourceDict[matching_variable].keys() for k in range(0,11)])

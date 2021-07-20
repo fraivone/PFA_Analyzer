@@ -23,7 +23,7 @@ except:
 try:
     from PFA_Analyzer_Utils import *
 except:
-    print "si strunz"
+    print ("ERROR:\n\tCan't find the package PFA_Analyzer_Utils\nEXITING...\n")
     sys.exit(0)
 
 parser = argparse.ArgumentParser(
@@ -39,6 +39,7 @@ parser.add_argument('--chamberOFF', type=str , help="file_path to the file conta
 parser.add_argument('--outputname', type=str, help="output file name",required=False)
 parser.add_argument('--fiducialR','-fR', type=float , help="fiducial cut along R axis",required=False)
 parser.add_argument('--fiducialPhi','-fP', type=float , help="fiducial cut along phi axis",required=False)
+parser.add_argument('--DLE', default=False, action='store_true',help="Swtiches on the Double Layer Efficiency (DLE) analisys. False by default",required=False)
 
 parser.add_argument('--minME1', type=int, help="Min number of ME1 hits",required=False)
 parser.add_argument('--minME2', type=int, help="Min number of ME2 hits",required=False)
@@ -62,16 +63,17 @@ ROOT.gROOT.SetBatch(True)
 
 start_time = time.time()
 
-files = files_in_folder("/eos/user/f/fivone/GEMNTuples/MWGR/2021/MWGR4/342218_MEHits/")
+files = files_in_folder("/eos/user/f/fivone/GEMNTuples/MC/Output/MC_Cosmics2021/wMEXHits/")
 files = [f for f in files if ".root" in f]
 
 matching_variables = ['glb_phi','glb_rdphi']
 matching_variable_units = {'glb_phi':'rad','glb_rdphi':'cm'}
 ResidualCutOff= {'glb_phi':args.phi_cut,'glb_rdphi':args.rdphi_cut}
 
+DLE = args.DLE
 fiducialCut = True
-maxErrOnPropR = 1
-maxErrOnPropPhi = 0.01
+maxErrOnPropR = 100
+maxErrOnPropPhi = 100
 fiducialR = args.fiducialR
 fiducialPhi = args.fiducialPhi
 CutminPt = 0.
@@ -101,11 +103,14 @@ TH2min = -80
 
 EfficiencyDictGlobal = dict((m,{}) for m in matching_variables)
 EfficiencyDictDirection = dict((m,{}) for m in matching_variables)
+EfficiencyDictLayer = dict((m,{}) for m in matching_variables)
 
 ## ROOT Object declaration
 test = ROOT.TH2F("DirX_CLS","DirX_CLS",40,-1,1,128,0,128)
 test.GetXaxis().SetTitle("dirX")
 test.GetYaxis().SetTitle("CLS")
+DLE_ErrPhi = ROOT.TH1F("DLE_ErrPhi","DLE_ErrPhi",100,0,0.0025)
+DLE_ErrR = ROOT.TH1F("DLE_ErrR","DLE_ErrR",100,0,5)
 
 TH1Fresidual_collector = {}
 TH2Fresidual_collector = generate2DResidualContainer(matching_variables,TH2nbins,TH2min)  
@@ -298,12 +303,13 @@ for chain_index,evt in enumerate(chain):
     n_gemprop = len(evt.mu_propagated_chamber)
     n_gemrec = len(evt.gemRecHit_chamber)
     
+    
     THSanityChecks['NHits']['BeforeMatching']['PerEVT']['Prop'].Fill(n_gemprop)
     THSanityChecks['NHits']['BeforeMatching']['PerEVT']['Reco'].Fill(n_gemrec)
     
 
     ## Discard null entries
-    if n_gemprop==0 or n_gemrec==0:
+    if n_gemprop==0:
         continue
 
 
@@ -403,8 +409,6 @@ for chain_index,evt in enumerate(chain):
             PropHit_Dict[PropHitChamberID]['nME2Hits'].append(evt.mu_propagated_nME2hits[PropHit_index])
             PropHit_Dict[PropHitChamberID]['nME3Hits'].append(evt.mu_propagated_nME3hits[PropHit_index])
             PropHit_Dict[PropHitChamberID]['nME4Hits'].append(evt.mu_propagated_nME4hits[PropHit_index])
-            
-            
 
             THSanityChecks['Occupancy']['BeforeMatching']['Prop'].Fill(evt.mu_propagatedGlb_x[PropHit_index],evt.mu_propagatedGlb_y[PropHit_index])
             THSanityChecks['Occupancy']['BeforeMatching'][endcapKey]['PropHits'].Fill(chamber,etaP)
@@ -426,10 +430,24 @@ for chain_index,evt in enumerate(chain):
 
     ### Matching criteria between propagated hits from ME11 and RecHits : 
     ##      1.SAME REGION,SC,LAYER,ETA -->SAME etaPartitionID
+    ##      When using DLE, only evts w/ exactly 2 PropHit in a SC: 1 hit per Layer with Delta(etaP) < 4
+
+    if DLE and (len(PropHit_Dict.keys()) != 2 or abs(PropHit_Dict.keys()[0] - PropHit_Dict.keys()[1] ) > 13) :
+        continue
+
+    layer1Match = False
+    layer2Match = False
+    layer1PassedCut = False
+    layer2PassedCut = False
+    layer1pt = 0
+    layer1etapID = 0
+    layer2pt = 0
+    layer2etapID = 0
     for etaPartitionID in PropHit_Dict.keys():
         
         region,chamber,layer,eta = getInfoFromEtaID(etaPartitionID)
         PropHitonEta = PropHit_Dict[etaPartitionID]
+
 
         nPropHitsOnEtaID = len(PropHitonEta['glb_phi'])
         THSanityChecks['NHits']['PerEVT_PerEtaPartitionID']['Prop'].Fill(nPropHitsOnEtaID)
@@ -439,8 +457,10 @@ for chain_index,evt in enumerate(chain):
         for mv in matching_variables:
             EfficiencyDictGlobal[mv].setdefault(etaPartitionID,{})
             EfficiencyDictDirection[mv].setdefault(etaPartitionID,{})
+            EfficiencyDictLayer[mv].setdefault(etaPartitionID,{})
             for pt in range(0,11):
                 EfficiencyDictGlobal[mv][etaPartitionID].setdefault(pt,{'num':0,'den':0})
+                EfficiencyDictLayer[mv][etaPartitionID].setdefault(pt,{'num':0,'den':0})
             for j in range(0,10):
                 EfficiencyDictDirection[mv][etaPartitionID].setdefault(j,{'num':0,'den':0})
 
@@ -467,19 +487,19 @@ for chain_index,evt in enumerate(chain):
             #print "No good STA propagation for etaPartitionID =  ",etaPartitionID
             continue
     
-
-
-        if etaPartitionID not in RecHit_Dict:
-            #print "No rechit in etaPartitionID =  ",etaPartitionID
-            continue
-        
-
         PropHitonEta = passedCutProp
         nGoodPropagation = len(PropHitonEta['glb_phi'])        
-        RecHitonEta = RecHit_Dict[etaPartitionID]
+        if DLE:    
+            if layer == 1:
+                layer1PassedCut = True
+                layer1etapID = etaPartitionID
+                layer1pt = 5 ## Fake pt value in GeV ... no B field
+            if layer == 2:
+                layer2PassedCut = True
+                layer2etapID = etaPartitionID
+                layer2pt = 5 ## Fake pt value in GeV ... no B field
 
-        THSanityChecks['NHits']['PerEVT_PerEtaPartitionID']['Reco'].Fill(len(RecHitonEta['glb_phi']))
-
+        ## Filling STA properties in histos
         for k in range(nGoodPropagation):
             THSanityChecks['PropagationError']['glb_phi_error']['all'].Fill(PropHitonEta['err_glb_phi'][k])
             THSanityChecks['PropagationError']['glb_r_error']['all'].Fill(PropHitonEta['err_glb_r'][k])
@@ -511,10 +531,22 @@ for chain_index,evt in enumerate(chain):
             THSanityChecks['PropagationError']['glb_phi_error']['eta'+str(eta)].Fill(PropHitonEta['err_glb_phi'][k])
             THSanityChecks['PropagationError']['glb_r_error']['eta'+str(eta)].Fill(PropHitonEta['err_glb_r'][k])
 
+
+        if etaPartitionID not in RecHit_Dict:
+            # print "Nothing to match on ", etaPartitionID
+            # print PropHit_Dict[etaPartitionID]['glb_phi']
+            # raw_input()
+            #print "No rechit in etaPartitionID =  ",etaPartitionID
+            continue
+        else: 
+            RecHitonEta = RecHit_Dict[etaPartitionID]
+    
+        THSanityChecks['NHits']['PerEVT_PerEtaPartitionID']['Reco'].Fill(len(RecHitonEta['glb_phi']))
+
+
         ## Seek for 1-best match between rec and prop based on Matching Var and Cutoff
         for matchingVar in matching_variables:
-
-                   
+                               
             residuals = []
             RecoMatched = []
             PropMatched = []
@@ -530,6 +562,10 @@ for chain_index,evt in enumerate(chain):
                 min_residual_index = residuals.index(min_residual)
                 prop_hit_index = PropHitonEta['glb_phi'].index(PropMatched[min_residual_index])
                 reco_hit_index = RecHitonEta['glb_phi'].index(RecoMatched[min_residual_index])
+
+
+
+
             else:
                 for RecHit_var in RecHitonEta[matchingVar]:
                     deltas = [PropHit_var - RecHit_var for PropHit_var in PropHitonEta[matchingVar]]
@@ -549,10 +585,8 @@ for chain_index,evt in enumerate(chain):
 
             if matchingVar == 'glb_phi':
                 THSanityChecks['Residual_Correlation']['glb_phi_vs_glb_rdphi'].Fill(glb_phi_residual,glb_rdphi_residual)
-
                 THSanityChecks['Residual_Correlation']['glb_rdphi_dir_x'].Fill(glb_rdphi_residual,np.arccos(PropHitonEta['Loc_dirX'][prop_hit_index]))
 
-            
 
             if abs(min_residual) < ResidualCutOff[matchingVar]:
 
@@ -570,8 +604,6 @@ for chain_index,evt in enumerate(chain):
                 TH2Fresidual_collector[matchingVar]['all']['glb_rdphi'][binx][biny][0] += 1
                 TH2Fresidual_collector[matchingVar]['all']['glb_phi'][binx][biny][1] += abs(glb_phi_residual)
                 TH2Fresidual_collector[matchingVar]['all']['glb_rdphi'][binx][biny][1] += abs(glb_rdphi_residual)
-
-
 
                 THSanityChecks['Occupancy'][matchingVar]['AfterMatching']['Reco'].Fill(RecHitonEta['glb_x'][reco_hit_index],RecHitonEta['glb_y'][reco_hit_index])
                 THSanityChecks['Occupancy'][matchingVar]['AfterMatching']['Prop'].Fill(PropHitonEta['glb_x'][prop_hit_index],PropHitonEta['glb_y'][prop_hit_index])
@@ -613,11 +645,38 @@ for chain_index,evt in enumerate(chain):
                     TH1Fresidual_collector[matchingVar][endcap+"L"+str(layer)][chamber].Fill(glb_rdphi_residual)
                     test.Fill(PropHitonEta['Loc_dirX'][prop_hit_index],RecHitonEta['cluster_size'][reco_hit_index])
                     
+                    if layer == 1:
+                        layer1Match = True
+                    if layer == 2:
+                        layer2Match = True
+                    
             else:
+                # print "Matching failed for ", etaPartitionID
+                # print PropHit_Dict[etaPartitionID]['glb_phi'], RecHit_Dict[etaPartitionID]['glb_phi']
+                # raw_input()
                 pass
+                
+        ## Loop over etaPID 
 
-            
-    ## End on the matching/filling loop  
+    ## Double Layer Efficiency (DLE): test layer1(2) with tracks that do have a match in layer1(2)
+
+    if DLE and layer2Match and layer1PassedCut and layer2PassedCut:
+        EfficiencyDictLayer['glb_rdphi'][layer1etapID][pt_index(layer1pt)]['den'] += 1
+        DLE_ErrPhi.Fill(PropHitonEta['err_glb_phi'][prop_hit_index])
+        DLE_ErrR.Fill(PropHitonEta['err_glb_r'][prop_hit_index])
+
+        if layer1Match == True:
+            EfficiencyDictLayer['glb_rdphi'][layer1etapID][pt_index(layer1pt)]['num'] += 1
+
+    if DLE and layer1Match and layer2PassedCut and layer1PassedCut:
+        EfficiencyDictLayer['glb_rdphi'][layer2etapID][pt_index(layer2pt)]['den'] += 1
+        DLE_ErrPhi.Fill(PropHitonEta['err_glb_phi'][prop_hit_index])
+        DLE_ErrR.Fill(PropHitonEta['err_glb_r'][prop_hit_index])
+
+        if layer2Match:
+            EfficiencyDictLayer['glb_rdphi'][layer2etapID][pt_index(layer1pt)]['num'] += 1
+
+    ## Loop over evts
 
     THSanityChecks['NHits']['AfterMatching']['All'].Fill(ML1_N_MatchedGEMRecoHits + ML2_N_MatchedGEMRecoHits  +  PL1_N_MatchedGEMRecoHits + PL2_N_MatchedGEMRecoHits)
     THSanityChecks['NHits']['AfterMatching']['ML1'].Fill(ML1_N_MatchedGEMRecoHits)
@@ -741,6 +800,19 @@ for matchingVar in matching_variables:
     writeToTFile(OutF,GE11efficiencyByPt_Long,"Efficiency/"+matchingVar+"/ByPt/")
     writeToTFile(OutF,GE11efficiencyByPt_All,"Efficiency/"+matchingVar+"/ByPt/")
 
+    if DLE and matchingVar=='glb_rdphi':
+        DLE_2DPlotAll,DLE_Num2DAll,DLE_Den2DAll,DLE_SummaryAll = generateEfficiencyPlot2DGE11(EfficiencyDictLayer[matchingVar],[-1,1],[1,2])
+        DLE_ByEta_Short,DLE_ByEta_Long,DLE_ByEta_All = generateEfficiencyPlotbyEta(EfficiencyDictLayer[matchingVar],[1,-1],[1,2])
+        writeToTFile(OutF,DLE_2DPlotAll,"Efficiency/DLE/2DView/")
+        writeToTFile(OutF,DLE_Num2DAll,"Efficiency/DLE/2DView/")
+        writeToTFile(OutF,DLE_Den2DAll,"Efficiency/DLE/2DView/")
+        writeToTFile(OutF,DLE_SummaryAll,"Efficiency/DLE/")
+        writeToTFile(OutF,DLE_ByEta_Short,"Efficiency/DLE/ByEta/")
+        writeToTFile(OutF,DLE_ByEta_Long,"Efficiency/DLE/ByEta/")
+        writeToTFile(OutF,DLE_ByEta_All,"Efficiency/DLE/ByEta/")
+        writeToTFile(OutF,DLE_ErrR,"Efficiency/DLE/PropError/")
+        writeToTFile(OutF,DLE_ErrPhi,"Efficiency/DLE/PropError/")
+
     writeToTFile(OutF,THSanityChecks['Occupancy'][matchingVar]['AfterMatching']['Reco'],"SanityChecks/Occupancy/AfterMatching_"+matchingVar+"/")
     writeToTFile(OutF,THSanityChecks['Occupancy'][matchingVar]['AfterMatching']['Prop'],"SanityChecks/Occupancy/AfterMatching_"+matchingVar+"/") 
     writeToTFile(OutF,THSanityChecks['Occupancy'][matchingVar]['AfterMatching']['PropLocalLong'],"SanityChecks/Occupancy/AfterMatching_"+matchingVar+"/") 
@@ -752,9 +824,10 @@ for matchingVar in matching_variables:
             reg_tag_string = "P" if r == 1 else "M"
             lay_tag_string = "L1" if l == 1 else "L2"
 
+            
             efficiency2DPlot,Num2D,Den2D,Summary = generateEfficiencyPlot2DGE11(EfficiencyDictGlobal[matchingVar],r,l)
             efficiencyByEta_Short,efficiencyByEta_Long,efficiencyByEta_All =  generateEfficiencyPlotbyEta(EfficiencyDictGlobal[matchingVar],r,l)
-            
+                       
             c1 = setUpCanvas("c1",2400,900)
             c1.SetLeftMargin(0.07)
             c1.SetRightMargin(0.09)
@@ -772,6 +845,15 @@ for matchingVar in matching_variables:
             writeToTFile(OutF,Num2D,"Efficiency/"+matchingVar+"/2DView/"+reg_tag_string+lay_tag_string+"/")
             writeToTFile(OutF,Den2D,"Efficiency/"+matchingVar+"/2DView/"+reg_tag_string+lay_tag_string+"/")
             writeToTFile(OutF,Summary,"Efficiency/"+matchingVar+"/")
+
+
+            if DLE and matchingVar=='glb_rdphi':
+                DLE_2DPlot,DLE_Num2D,DLE_Den2D,DLE_Summary = generateEfficiencyPlot2DGE11(EfficiencyDictLayer[matchingVar],r,l)
+                DLE_ByEta_Short,DLE_ByEta_Long,DLE_ByEta_All =  generateEfficiencyPlotbyEta(EfficiencyDictLayer[matchingVar],r,l)
+                writeToTFile(OutF,DLE_2DPlot,"Efficiency/DLE/2DView/"+reg_tag_string+lay_tag_string+"/")
+                writeToTFile(OutF,DLE_Num2D,"Efficiency/DLE/2DView/"+reg_tag_string+lay_tag_string+"/")
+                writeToTFile(OutF,DLE_Den2D,"Efficiency/DLE/2DView/"+reg_tag_string+lay_tag_string+"/")
+                writeToTFile(OutF,DLE_Summary,"Efficiency/DLE/"+reg_tag_string+lay_tag_string+"/")
             
             
             c1.cd()
@@ -800,6 +882,11 @@ for matchingVar in matching_variables:
             writeToTFile(OutF,efficiencyByEta_Short,"Efficiency/"+matchingVar+"/ByEta/"+reg_tag_string+lay_tag_string+"/")
             writeToTFile(OutF,efficiencyByEta_Long,"Efficiency/"+matchingVar+"/ByEta/"+reg_tag_string+lay_tag_string+"/")
             writeToTFile(OutF,efficiencyByEta_All,"Efficiency/"+matchingVar+"/ByEta/"+reg_tag_string+lay_tag_string+"/")
+
+            writeToTFile(OutF,DLE_ByEta_Short,"Efficiency/DLE/ByEta/"+reg_tag_string+lay_tag_string+"/")
+            writeToTFile(OutF,DLE_ByEta_Long,"Efficiency/DLE/ByEta/"+reg_tag_string+lay_tag_string+"/")
+            writeToTFile(OutF,DLE_ByEta_All,"Efficiency/DLE/ByEta/"+reg_tag_string+lay_tag_string+"/")
+
 
 
 for key in TH1MetaData.keys():
