@@ -34,6 +34,75 @@ def importOFFChamber(file_path):
     
     return chamberNumberOFF
 
+def VFAT2iEta_iPhi(VFATN):
+    try:
+        vfatPosition = int(VFATN)
+    except:
+        print "VFAT Number provided is not a number.\nExiting..."
+        sys.exit(0)
+
+    if vfatPosition <0 or vfatPosition>23:
+        print "Invalid VFAT position.\nExiting..."
+        sys.exit(0)
+
+    iEta = (8 - vfatPosition%8)
+    iPhi = vfatPosition/8
+    return iEta,iPhi
+
+def iEta_iPhi2VFAT(iEta,iPhi):
+    try:
+        etaP = int(iEta)
+        phi = int(iPhi)
+    except:
+        print "Provided iEta and/or iPhi are not numbers.\nExiting..."
+        sys.exit(0)
+    
+    if iEta <1 or iEta>8 or iPhi <0 or iPhi>2:
+        print "Invalid iEta and/or iPhi provided position.\nExiting..."
+        sys.exit(0)
+    
+    VFAT = iPhi*8 + (8-iEta)
+    return VFAT
+
+## Associates a propagated hit to a VFAT
+## It is based on default GE11 geometry
+## Might need refinements after alignment 
+def propHit2VFAT(glb_r,loc_x,etaP):
+    ## Magic numbers taken from strip geometry
+    #  They are loc_x/glb_r (basically cos phi) for strip 127 and 255 respectively
+    LeftMost_iPhi_boundary = -0.029824804
+    RightMost_iPhi_boundary = 0.029362374
+
+    prophit_cosine = loc_x/glb_r
+    iPhi =  0 if  prophit_cosine<=LeftMost_iPhi_boundary else (2 if prophit_cosine>RightMost_iPhi_boundary else 1)
+
+    VFAT = iEta_iPhi2VFAT(etaP,iPhi)
+
+    return VFAT
+
+## returns a dict with a list of OFF VFAT for each  etapartitionID (key of the dict)
+def importOFFVFAT(file_path):
+    try:
+        df = pd.read_csv(file_path, sep='\t')
+    except IOError:
+        print "Couldn't open file : "+file_path+"\nExiting .."
+        sys.exit(0)
+    
+    off_VFAT = {}
+    for index, row in df.iterrows():
+        region =  -1 if row['region']=='N' else (1 if row['region']=='P' else None)
+        layer = int(row['layer'])
+        chamber = int(row['chamber'])
+        VFAT = int(row['VFAT'])
+        maskReason = int(row['reason_mask'])
+
+        iEta , iPhi = VFAT2iEta_iPhi(VFAT)
+        etaPartitionID = region*(100*chamber+10*layer+iEta)
+
+        off_VFAT.setdefault(etaPartitionID,[])
+        off_VFAT[etaPartitionID].append(VFAT)
+    return off_VFAT
+
 def chamberName2ReChLa(chamberName):
     re = -1 if "M" in chamberName else 1
     ch = int( chamberName.split("-")[-1][:2] )
@@ -48,24 +117,48 @@ def ReChLa2chamberName(re,ch,la):
 
 def ChambersOFFHisto(chamberNumberOFF):
     GE11_OFF = {-1:{},1:{}}
-    GE11_OFF[-1][1] = ROOT.TH1F("GE11-M-L1_isAnalyzed","GE11-M-L1_isAnalyzed",36,0.5,36.5)
-    GE11_OFF[-1][2] = ROOT.TH1F("GE11-M-L2_isAnalyzed","GE11-M-L2_isAnalyzed",36,0.5,36.5)
-    GE11_OFF[1][1] = ROOT.TH1F("GE11-P-L1_isAnalyzed","GE11-P-L_isAnalyzed",36,0.5,36.5)
-    GE11_OFF[1][2] = ROOT.TH1F("GE11-P-L2_isAnalyzed","GE11-P-L2_isAnalyzed",36,0.5,36.5)
+    GE11_OFF[-1][1] = ROOT.TH1F("GE11-M-L1  Discarded Chambers","GE11-M-L1  Discarded Chambers",36,0.5,36.5)
+    GE11_OFF[-1][2] = ROOT.TH1F("GE11-M-L2  Discarded Chambers","GE11-M-L2  Discarded Chambers",36,0.5,36.5)
+    GE11_OFF[1][1] = ROOT.TH1F("GE11-P-L1  Discarded Chambers","GE11-P-L1  Discarded Chambers",36,0.5,36.5)
+    GE11_OFF[1][2] = ROOT.TH1F("GE11-P-L2  Discarded Chambers","GE11-P-L2  Discarded Chambers",36,0.5,36.5)
 
     for region in [-1,1]:
         for layer in [1,2]:
             for chamber in range(1,37):
                 if [region,chamber,layer] in chamberNumberOFF:
-                    GE11_OFF[region][layer].SetBinContent(chamber,0)
-                else:
                     GE11_OFF[region][layer].SetBinContent(chamber,1)
+                else:
+                    GE11_OFF[region][layer].SetBinContent(chamber,0)
     for key_1 in GE11_OFF.keys():
         for key_2 in GE11_OFF[key_1].keys():
             GE11_OFF[key_1][key_2].GetYaxis().SetTickLength(0.005)
             GE11_OFF[key_1][key_2].SetStats(False)
+            GE11_OFF[key_1][key_2].SetMinimum(0)
+            GE11_OFF[key_1][key_2].SetMaximum(2)
+    return GE11_OFF[-1][1],GE11_OFF[1][1],GE11_OFF[-1][2],GE11_OFF[1][2]
 
-    return GE11_OFF[-1][1],GE11_OFF[-1][2],GE11_OFF[1][1],GE11_OFF[1][2]
+
+
+def VFATOFFHisto(VFATOFF_dictionary):
+    VFAT_OFFTH2D = {-1:{},1:{}}
+    VFAT_OFFTH2D[-1][1] = ROOT.TH2F("GE11-M-L1  Discarded VFAT","GE11-M-L1  Discarded VFAT",36,0.5,36.5,24,-0.5,23.5)
+    VFAT_OFFTH2D[-1][2] = ROOT.TH2F("GE11-M-L2  Discarded VFAT","GE11-M-L2  Discarded VFAT",36,0.5,36.5,24,-0.5,23.5)
+    VFAT_OFFTH2D[1][1] = ROOT.TH2F("GE11-P-L1  Discarded VFAT","GE11-P-L1  Discarded VFAT",36,0.5,36.5,24,-0.5,23.5)
+    VFAT_OFFTH2D[1][2] = ROOT.TH2F("GE11-P-L2  Discarded VFAT","GE11-P-L2  Discarded VFAT",36,0.5,36.5,24,-0.5,23.5)
+
+    for key_1 in VFAT_OFFTH2D.keys():
+        for key_2 in VFAT_OFFTH2D[key_1].keys():
+            VFAT_OFFTH2D[key_1][key_2].GetYaxis().SetTitle("VFAT Number")
+            VFAT_OFFTH2D[key_1][key_2].GetXaxis().SetTitle("Chamber")
+            VFAT_OFFTH2D[key_1][key_2].SetStats(False)
+            VFAT_OFFTH2D[key_1][key_2].SetMinimum(0)
+
+    for key, value in VFATOFF_dictionary.items():
+        region,chamber,layer,etaPartition = getInfoFromEtaID(key)
+        for VFATN in value:
+            VFAT_OFFTH2D[region][layer].Fill(chamber,VFATN)
+    
+    return VFAT_OFFTH2D[-1][1],VFAT_OFFTH2D[1][1],VFAT_OFFTH2D[-1][2],VFAT_OFFTH2D[1][2]
 
 def incidenceAngle_vs_Eff(sourceDict,input_region=1,input_layer=1):
     ## Transforming in list
@@ -98,6 +191,10 @@ def incidenceAngle_vs_Eff(sourceDict,input_region=1,input_layer=1):
         DenTH1F.SetBinContent((j+1),etaPartitionPropHits)
     
     Eff_Plot.Divide(NumTH1F,DenTH1F)
+    Eff_Plot.SetTitle(title+"_incidenceAngle_Eff")
+    Eff_Plot.SetName(title+"_incidenceAngle_Eff")
+    Eff_Plot.GetXaxis().SetTitle("Cos(#alpha)")
+    Eff_Plot.GetYaxis().SetTitle("Efficiency")
     return NumTH1F, DenTH1F, Eff_Plot
 
 
@@ -227,7 +324,7 @@ def generateEfficiencyPlotbyEta(sourceDict,input_region=1,input_layer=1):
         Plot_Container[chambers].SetMarkerStyle(20)
         Plot_Container[chambers].SetMarkerSize(.8)
 
-        TH1F_TempContainer.setdefault(chambers,{'num':ROOT.TH1F('num_'+chambers+title, title,8,0,8),'den':ROOT.TH1F('den_'+chambers+title, title,8,0,8)})
+        TH1F_TempContainer.setdefault(chambers,{'num':ROOT.TH1F('num_'+chambers+title, title,8,0.5,8.5),'den':ROOT.TH1F('den_'+chambers+title, title,8,0.5,8.5)})
 
     for etaPartitionID in sourceDict.keys():
         region,chamber,layer,eta = getInfoFromEtaID(etaPartitionID)

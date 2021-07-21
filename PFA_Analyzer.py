@@ -36,10 +36,12 @@ parser.add_argument('-pc','--phi_cut', type=float,help="Maximum allowed dphi bet
 parser.add_argument('-rdpc','--rdphi_cut', type=float,help="Maximum allowed rdphi between RecoHit and PropHit to be counted as matched hit",required=False)
 parser.add_argument('--chi2cut', type=float,help="Maximum normalized chi2 for which accept propagated tracks",required=False)
 parser.add_argument('--chamberOFF', type=str , help="file_path to the file containing a list of the chambers you want to exclude for the run (i.e. GE11-M-29L2)",required=False)
+parser.add_argument('--VFATOFF', type=str , help="file_path to the file containing a list of the VFAT you want to exclude from efficiency evaluation. The file must be tab separated with \tregion,layer,chamber,VFAT,reason_mask",required=False)
 parser.add_argument('--outputname', type=str, help="output file name",required=False)
 parser.add_argument('--fiducialR','-fR', type=float , help="fiducial cut along R axis",required=False)
 parser.add_argument('--fiducialPhi','-fP', type=float , help="fiducial cut along phi axis",required=False)
 parser.add_argument('--DLE', default=False, action='store_true',help="Swtiches on the Double Layer Efficiency (DLE) analisys. False by default",required=False)
+parser.add_argument('--dataset','-ds', type=str,help="Path to the folder containing the NTuples to be analyzed",required=True)
 
 parser.add_argument('--minME1', type=int, help="Min number of ME1 hits",required=False)
 parser.add_argument('--minME2', type=int, help="Min number of ME2 hits",required=False)
@@ -63,7 +65,7 @@ ROOT.gROOT.SetBatch(True)
 
 start_time = time.time()
 
-files = files_in_folder("/eos/user/f/fivone/GEMNTuples/MC/Output/MC_Cosmics2021/wMEXHits/")
+files = files_in_folder(args.dataset)
 files = [f for f in files if ".root" in f]
 
 matching_variables = ['glb_phi','glb_rdphi']
@@ -85,17 +87,27 @@ minME4Hit = args.minME4
 
 noisyEtaPID = []
 chamberNumberOFF = [] if args.chamberOFF is None else importOFFChamber(args.chamberOFF)
+VFATOFFDict = False if args.VFATOFF is None else importOFFVFAT(args.VFATOFF)
 
 chamberOFFCanvas = setUpCanvas("ExcludedChambers",1200,1200)
-chamberOFFCanvas.Divide(1,4)
+chamberOFFCanvas.Divide(2,2)
+VFATOFFCanvas = setUpCanvas("ExcludedVFAT",1200,1200)
+VFATOFFCanvas.Divide(2,2)
 
-for counter,plot in enumerate(ChambersOFFHisto(chamberNumberOFF)):
+OFFChambers_plot = ChambersOFFHisto(chamberNumberOFF)
+for counter,plot in enumerate(OFFChambers_plot):
     chamberOFFCanvas.cd(counter+1)
-    plot.Draw("")
+    plot.Draw()
+
+OFFVFATs_plot = VFATOFFHisto(VFATOFFDict)
+for counter,plot in enumerate(OFFVFATs_plot):
+    VFATOFFCanvas.cd(counter+1)
+    plot.Draw("COLZ")
 
 chamberOFFCanvas.Modified()
 chamberOFFCanvas.Update()
-
+VFATOFFCanvas.Modified()
+VFATOFFCanvas.Update()
 
 TH1nbins = 120
 TH2nbins = 200
@@ -158,6 +170,7 @@ TH1MetaData['minME2Hit'].Fill(minME2Hit)
 TH1MetaData['minME3Hit'].Fill(minME3Hit)
 TH1MetaData['minME4Hit'].Fill(minME4Hit)
 TH1MetaData['chamberOFFCanvas']=chamberOFFCanvas
+TH1MetaData['VFATOFFCanvas']=VFATOFFCanvas
 
 
 
@@ -298,9 +311,6 @@ for chain_index,evt in enumerate(chain):
     
     if chain_index % 40000 ==0:
         print round(float(chain_index)/float(chainEntries),3)*100,"%"
-    if chain_index == 80000:
-        break
-
 
     n_gemprop = len(evt.mu_propagated_chamber)
     n_gemrec = len(evt.gemRecHit_chamber)
@@ -371,6 +381,8 @@ for chain_index,evt in enumerate(chain):
         PropHitChamberID = region*(100*chamber+10*layer+etaP)
         endcapKey = "PL"+str(layer) if region > 0 else "ML"+str(layer)
 
+        
+
         outermost_z = evt.mu_propagated_Outermost_z[PropHit_index]
         is_incoming = evt.mu_isincoming[PropHit_index]
 
@@ -385,13 +397,22 @@ for chain_index,evt in enumerate(chain):
 
         propHitFromME11 = bool(evt.mu_propagated_isME11[PropHit_index])
         if propHitFromME11:
-            PropHit_Dict.setdefault(PropHitChamberID,{'loc_x':[],'loc_y':[],'glb_x':[],'glb_y':[],'glb_z':[],'glb_r':[],'glb_phi':[],'pt':[],'etaP':[],'err_glb_r':[],'err_glb_phi':[],'Loc_dirX':[],'Loc_dirY':[],'Loc_dirZ':[],'mu_propagated_isME11':[],'mu_propagated_EtaPartition_rMax':[],'mu_propagated_EtaPartition_rMin':[],'mu_propagated_isGEM':[],'mu_propagated_EtaPartition_phiMin':[],'mu_propagated_EtaPartition_phiMax':[],'STA_Normchi2':[],'nME1Hits':[],'nME2Hits':[],'nME3Hits':[],'nME4Hits':[]})    
-            PropHit_Dict[PropHitChamberID]['loc_x'].append(evt.mu_propagatedLoc_x[PropHit_index])
+            PropHit_Dict.setdefault(PropHitChamberID,{'loc_x':[],'loc_y':[],'glb_x':[],'glb_y':[],'glb_z':[],'glb_r':[],'glb_phi':[],'pt':[],'etaP':[],'err_glb_r':[],'err_glb_phi':[],'Loc_dirX':[],'Loc_dirY':[],'Loc_dirZ':[],'mu_propagated_isME11':[],'mu_propagated_EtaPartition_rMax':[],'mu_propagated_EtaPartition_rMin':[],'mu_propagated_isGEM':[],'mu_propagated_EtaPartition_phiMin':[],'mu_propagated_EtaPartition_phiMax':[],'STA_Normchi2':[],'nME1Hits':[],'nME2Hits':[],'nME3Hits':[],'nME4Hits':[]})
+
+            prop_glb_r = evt.mu_propagatedGlb_r[PropHit_index]
+            prop_loc_x = evt.mu_propagatedLoc_x[PropHit_index]
+
+            if PropHitChamberID in VFATOFFDict:
+                if propHit2VFAT(prop_glb_r,prop_loc_x,etaP) in VFATOFFDict[PropHitChamberID]:
+                    continue
+
+
+            PropHit_Dict[PropHitChamberID]['loc_x'].append(prop_loc_x)
             PropHit_Dict[PropHitChamberID]['loc_y'].append(evt.mu_propagatedLoc_y[PropHit_index])
             PropHit_Dict[PropHitChamberID]['glb_x'].append(evt.mu_propagatedGlb_x[PropHit_index])
             PropHit_Dict[PropHitChamberID]['glb_y'].append(evt.mu_propagatedGlb_y[PropHit_index])
             PropHit_Dict[PropHitChamberID]['glb_z'].append(evt.mu_propagatedGlb_z[PropHit_index])
-            PropHit_Dict[PropHitChamberID]['glb_r'].append(evt.mu_propagatedGlb_r[PropHit_index])
+            PropHit_Dict[PropHitChamberID]['glb_r'].append(prop_glb_r)
             PropHit_Dict[PropHitChamberID]['glb_phi'].append(evt.mu_propagatedGlb_phi[PropHit_index])
             PropHit_Dict[PropHitChamberID]['err_glb_r'].append(evt.mu_propagatedGlb_errR[PropHit_index])
             PropHit_Dict[PropHitChamberID]['err_glb_phi'].append(evt.mu_propagatedGlb_errPhi[PropHit_index])
