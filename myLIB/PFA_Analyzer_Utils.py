@@ -13,24 +13,30 @@ def getInfoFromEtaID(id):
     region = id/abs(id)
     return region,chamber,layer,etaPartition
 
-## Expects to have a file with list of "GE11-M-22L2" to be excluded
-def importOFFChamber(file_path):
-    try:
-        with open(file_path, "r") as my_file:
-            content = my_file.read()
-            chamber_OFF_list = content.split("\n")
-            try: ## Will remove 1 empty entry from the list, if any
-                chamber_OFF_list.remove('')
-            except:
-                pass
-            try:
-                chamberNumberOFF = [ chamberName2ReChLa(k) for k in chamber_OFF_list]
-            except:
-                print "Error in the formatting of Chamber names in the file " + file_path+"\nExiting .."
-                sys.exit(0)
-    except IOError:
-        print "Couldn't open file : "+file_path+"\nExiting .."
-        sys.exit(0)
+## Expects to have a list of file paths each containing a list of "GE11-*-XXLY" to be excluded
+def importOFFChamber(list_of_file_path):
+    chamberNumberOFF = []
+    for file_path in list_of_file_path:   
+        try:
+            with open(file_path, "r") as my_file:
+                content = my_file.read()
+                chamber_OFF_list = content.split("\n")
+                try: ## Will remove 1 empty entry from the list, if any
+                    chamber_OFF_list.remove('')
+                except:
+                    pass
+                try:
+                    findChambers = [ chamberName2ReChLa(k) for k in chamber_OFF_list]
+                except:
+                    print "Error in the formatting of Chamber names in the file " + file_path+"\nExiting .."
+                    sys.exit(0)
+                ## Avoiding duplicates
+                for chamber in findChambers:
+                    if chamber not in chamberNumberOFF:
+                        chamberNumberOFF.append(chamber)
+        except IOError:
+            print "Couldn't open file : "+file_path+"\nExiting .."
+            sys.exit(0)
     
     return chamberNumberOFF
 
@@ -81,26 +87,35 @@ def propHit2VFAT(glb_r,loc_x,etaP):
     return VFAT
 
 ## returns a dict with a list of OFF VFAT for each  etapartitionID (key of the dict)
-def importOFFVFAT(file_path):
-    try:
-        df = pd.read_csv(file_path, sep='\t')
-    except IOError:
-        print "Couldn't open file : "+file_path+"\nExiting .."
-        sys.exit(0)
-    
+def importOFFVFAT(list_of_file_path,chamberNumberOFF):
     off_VFAT = {}
-    for index, row in df.iterrows():
-        region =  -1 if row['region']=='N' else (1 if row['region']=='P' else None)
-        layer = int(row['layer'])
-        chamber = int(row['chamber'])
-        VFAT = int(row['VFAT'])
-        maskReason = int(row['reason_mask'])
+    for file_path in list_of_file_path:
+        try:
+            df = pd.read_csv(file_path, sep='\t')
+        except IOError:
+            print "Couldn't open file : "+file_path+"\nExiting .."
+            sys.exit(0)
 
-        iEta , iPhi = VFAT2iEta_iPhi(VFAT)
-        etaPartitionID = region*(100*chamber+10*layer+iEta)
+        off_VFAT = {}
+        for index, row in df.iterrows():
+            region =  -1 if row['region']=='N' else (1 if row['region']=='P' else None)
+            layer = int(row['layer'])
+            chamber = int(row['chamber'])
+            VFAT = int(row['VFAT'])
+            maskReason = int(row['reason_mask'])
 
-        off_VFAT.setdefault(etaPartitionID,[])
-        off_VFAT[etaPartitionID].append(VFAT)
+            iEta , iPhi = VFAT2iEta_iPhi(VFAT)
+            etaPartitionID = region*(100*chamber+10*layer+iEta)
+            ## Avoid to fill VFAT for which the entire chamber is OFF
+            if [region,chamber,layer] in chamberNumberOFF:
+                continue
+            ## If the key doesn't exsist create it. Pass otherwise
+            off_VFAT.setdefault(etaPartitionID,[])
+            off_VFAT[etaPartitionID].append(VFAT)
+    
+    ## Removing duplicates
+    for key, value in off_VFAT.items():
+        off_VFAT[key] = list(set(off_VFAT[key]))
     return off_VFAT
 
 def chamberName2ReChLa(chamberName):
@@ -114,13 +129,14 @@ def ReChLa2chamberName(re,ch,la):
     endcap = "M" if re == -1 else "P"
     size = "S" if ch%2 == 1 else "L"
     chID = 'GE11-'+endcap+'-%02d' % ch +"L"+str(la)+"-"+size 
+    return chID
 
 def ChambersOFFHisto(chamberNumberOFF):
     GE11_OFF = {-1:{},1:{}}
-    GE11_OFF[-1][1] = ROOT.TH1F("GE11-M-L1  Discarded Chambers","GE11-M-L1  Discarded Chambers",36,0.5,36.5)
-    GE11_OFF[-1][2] = ROOT.TH1F("GE11-M-L2  Discarded Chambers","GE11-M-L2  Discarded Chambers",36,0.5,36.5)
-    GE11_OFF[1][1] = ROOT.TH1F("GE11-P-L1  Discarded Chambers","GE11-P-L1  Discarded Chambers",36,0.5,36.5)
-    GE11_OFF[1][2] = ROOT.TH1F("GE11-P-L2  Discarded Chambers","GE11-P-L2  Discarded Chambers",36,0.5,36.5)
+    GE11_OFF[-1][1] = ROOT.TH1F("GE11-M-L1  Masked Chambers","GE11-M-L1  Masked Chambers",36,0.5,36.5)
+    GE11_OFF[-1][2] = ROOT.TH1F("GE11-M-L2  Masked Chambers","GE11-M-L2  Masked Chambers",36,0.5,36.5)
+    GE11_OFF[1][1] = ROOT.TH1F("GE11-P-L1  Masked Chambers","GE11-P-L1  Masked Chambers",36,0.5,36.5)
+    GE11_OFF[1][2] = ROOT.TH1F("GE11-P-L2  Masked Chambers","GE11-P-L2  Masked Chambers",36,0.5,36.5)
 
     for region in [-1,1]:
         for layer in [1,2]:
@@ -141,10 +157,10 @@ def ChambersOFFHisto(chamberNumberOFF):
 
 def VFATOFFHisto(VFATOFF_dictionary):
     VFAT_OFFTH2D = {-1:{},1:{}}
-    VFAT_OFFTH2D[-1][1] = ROOT.TH2F("GE11-M-L1  Discarded VFAT","GE11-M-L1  Discarded VFAT",36,0.5,36.5,24,-0.5,23.5)
-    VFAT_OFFTH2D[-1][2] = ROOT.TH2F("GE11-M-L2  Discarded VFAT","GE11-M-L2  Discarded VFAT",36,0.5,36.5,24,-0.5,23.5)
-    VFAT_OFFTH2D[1][1] = ROOT.TH2F("GE11-P-L1  Discarded VFAT","GE11-P-L1  Discarded VFAT",36,0.5,36.5,24,-0.5,23.5)
-    VFAT_OFFTH2D[1][2] = ROOT.TH2F("GE11-P-L2  Discarded VFAT","GE11-P-L2  Discarded VFAT",36,0.5,36.5,24,-0.5,23.5)
+    VFAT_OFFTH2D[-1][1] = ROOT.TH2F("GE11-M-L1  Masked VFAT","GE11-M-L1  Masked VFAT",36,0.5,36.5,24,-0.5,23.5)
+    VFAT_OFFTH2D[-1][2] = ROOT.TH2F("GE11-M-L2  Masked VFAT","GE11-M-L2  Masked VFAT",36,0.5,36.5,24,-0.5,23.5)
+    VFAT_OFFTH2D[1][1] = ROOT.TH2F("GE11-P-L1  Masked VFAT","GE11-P-L1  Masked VFAT",36,0.5,36.5,24,-0.5,23.5)
+    VFAT_OFFTH2D[1][2] = ROOT.TH2F("GE11-P-L2  Masked VFAT","GE11-P-L2  Masked VFAT",36,0.5,36.5,24,-0.5,23.5)
 
     for key_1 in VFAT_OFFTH2D.keys():
         for key_2 in VFAT_OFFTH2D[key_1].keys():
@@ -159,6 +175,39 @@ def VFATOFFHisto(VFATOFF_dictionary):
             VFAT_OFFTH2D[region][layer].Fill(chamber,VFATN)
     
     return VFAT_OFFTH2D[-1][1],VFAT_OFFTH2D[1][1],VFAT_OFFTH2D[-1][2],VFAT_OFFTH2D[1][2]
+
+
+def GE11DiscardedSummary(chamberNumberOFF,VFATOFF_dictionary):
+    VFAT_OFFTH2D = {-1:{},1:{}}
+    VFAT_OFFTH2D[-1][1] = ROOT.TH2F("GE11-M-L1  Masked Surface","GE11-M-L1  Masked Surface",36,0.5,36.5,24,-0.5,23.5)
+    VFAT_OFFTH2D[-1][2] = ROOT.TH2F("GE11-M-L2  Masked Surface","GE11-M-L2  Masked Surface",36,0.5,36.5,24,-0.5,23.5)
+    VFAT_OFFTH2D[1][1] = ROOT.TH2F("GE11-P-L1  Masked Surface","GE11-P-L1  Masked Surface",36,0.5,36.5,24,-0.5,23.5)
+    VFAT_OFFTH2D[1][2] = ROOT.TH2F("GE11-P-L2  Masked Surface","GE11-P-L2  Masked Surface",36,0.5,36.5,24,-0.5,23.5)
+
+    OFFVFAT_Counter = 0
+
+    for key_1 in VFAT_OFFTH2D.keys():
+        for key_2 in VFAT_OFFTH2D[key_1].keys():
+            VFAT_OFFTH2D[key_1][key_2].GetYaxis().SetTitle("VFAT Number")
+            VFAT_OFFTH2D[key_1][key_2].GetXaxis().SetTitle("Chamber")
+            VFAT_OFFTH2D[key_1][key_2].SetStats(False)
+            VFAT_OFFTH2D[key_1][key_2].SetMinimum(0)
+
+    for key, value in VFATOFF_dictionary.items():
+        region,chamber,layer,etaPartition = getInfoFromEtaID(key)
+        for VFATN in value:
+            VFAT_OFFTH2D[region][layer].Fill(chamber,VFATN)
+            OFFVFAT_Counter += 1
+    
+    for region in [-1,1]:
+        for layer in [1,2]:
+            for chamber in range(1,37):
+                if [region,chamber,layer] in chamberNumberOFF:
+                    for VFATN in range(0,24):
+                        VFAT_OFFTH2D[region][layer].Fill(chamber,VFATN)
+                        OFFVFAT_Counter += 1
+
+    return [VFAT_OFFTH2D[-1][1],VFAT_OFFTH2D[1][1],VFAT_OFFTH2D[-1][2],VFAT_OFFTH2D[1][2]],OFFVFAT_Counter
 
 def incidenceAngle_vs_Eff(sourceDict,input_region=1,input_layer=1):
     ## Transforming in list

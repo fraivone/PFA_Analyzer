@@ -35,13 +35,14 @@ parser = argparse.ArgumentParser(
 parser.add_argument('-pc','--phi_cut', type=float,help="Maximum allowed dphi between RecoHit and PropHit to be counted as matched hit",required=False)
 parser.add_argument('-rdpc','--rdphi_cut', type=float,help="Maximum allowed rdphi between RecoHit and PropHit to be counted as matched hit",required=False)
 parser.add_argument('--chi2cut', type=float,help="Maximum normalized chi2 for which accept propagated tracks",required=False)
-parser.add_argument('--chamberOFF', type=str , help="file_path to the file containing a list of the chambers you want to exclude for the run (i.e. GE11-M-29L2)",required=False)
-parser.add_argument('--VFATOFF', type=str , help="file_path to the file containing a list of the VFAT you want to exclude from efficiency evaluation. The file must be tab separated with \tregion,layer,chamber,VFAT,reason_mask",required=False)
+parser.add_argument('--chamberOFF', type=str , help="file_path to the file containing a list of the chambers you want to exclude for the run (i.e. GE11-M-29L2)",required=False,nargs='*')
+parser.add_argument('--VFATOFF', type=str , help="file_path to the file containing a list of the VFAT you want to exclude from efficiency evaluation. The file must be tab separated with \tregion,layer,chamber,VFAT,reason_mask",required=False,nargs='*')
 parser.add_argument('--outputname', type=str, help="output file name",required=False)
 parser.add_argument('--fiducialR','-fR', type=float , help="fiducial cut along R axis",required=False)
 parser.add_argument('--fiducialPhi','-fP', type=float , help="fiducial cut along phi axis",required=False)
 parser.add_argument('--DLE', default=False, action='store_true',help="Swtiches on the Double Layer Efficiency (DLE) analisys. False by default",required=False)
-parser.add_argument('--dataset','-ds', type=str,help="Path to the folder containing the NTuples to be analyzed",required=True)
+parser.add_argument('--FD', default=False, action='store_true',help="When enabled, allows the storage of all GEM RecHit Digis. False by default, which means that GEM RecHit Digis are stored only for EVTs in which STA propagation hits GEM",required=False)
+parser.add_argument('--dataset','-ds', type=str,help="Path to the folder containing the NTuples to be analyzed",required=True,nargs='*')
 
 parser.add_argument('--minME1', type=int, help="Min number of ME1 hits",required=False)
 parser.add_argument('--minME2', type=int, help="Min number of ME2 hits",required=False)
@@ -65,14 +66,17 @@ ROOT.gROOT.SetBatch(True)
 
 start_time = time.time()
 
-files = files_in_folder(args.dataset)
-files = [f for f in files if ".root" in f]
+files = []
+for folder in args.dataset:
+    temp_files = files_in_folder(folder)
+    files += [f for f in temp_files if ".root" in f]
 
 matching_variables = ['glb_phi','glb_rdphi']
 matching_variable_units = {'glb_phi':'rad','glb_rdphi':'cm'}
 ResidualCutOff= {'glb_phi':args.phi_cut,'glb_rdphi':args.rdphi_cut}
 
 DLE = args.DLE
+FD = args.FD
 fiducialCut = True
 maxErrOnPropR = 1
 maxErrOnPropPhi = 0.01
@@ -87,12 +91,14 @@ minME4Hit = args.minME4
 
 noisyEtaPID = []
 chamberNumberOFF = [] if args.chamberOFF is None else importOFFChamber(args.chamberOFF)
-VFATOFFDict = False if args.VFATOFF is None else importOFFVFAT(args.VFATOFF)
+VFATOFFDict = {} if args.VFATOFF is None else importOFFVFAT(args.VFATOFF,chamberNumberOFF)
 
 chamberOFFCanvas = setUpCanvas("ExcludedChambers",1200,1200)
 chamberOFFCanvas.Divide(2,2)
 VFATOFFCanvas = setUpCanvas("ExcludedVFAT",1200,1200)
 VFATOFFCanvas.Divide(2,2)
+ExclusionSummaryCanvas = setUpCanvas("GE11 Masked",1200,1200)
+ExclusionSummaryCanvas.Divide(2,2)
 
 OFFChambers_plot = ChambersOFFHisto(chamberNumberOFF)
 for counter,plot in enumerate(OFFChambers_plot):
@@ -104,10 +110,26 @@ for counter,plot in enumerate(OFFVFATs_plot):
     VFATOFFCanvas.cd(counter+1)
     plot.Draw("COLZ")
 
+GE11Discarded_plot, NexcludedVFAT = GE11DiscardedSummary(chamberNumberOFF,VFATOFFDict)
+for counter,plot in enumerate(GE11Discarded_plot):
+    ExclusionSummaryCanvas.cd(counter+1)
+    plot.Draw("COLZ")
+ExclusionSummaryCanvas.cd()
+tempPad=ROOT.TPad("tempPad","tempPad",0,0,1,1)
+tempPad.SetFillStyle(4000)
+tempPad.Draw()
+tempPad.cd()
+s = "VFAT Masked: "+str(NexcludedVFAT)+"/"+str(144*24)+"   "+str(100-100*round(float(NexcludedVFAT)/(144*24),3))+"% GE11 Surface Analysed"
+t = ROOT.TLatex(0.15,0.5,s)
+t.SetTextSize(0.035)
+t.Draw()
+
 chamberOFFCanvas.Modified()
 chamberOFFCanvas.Update()
 VFATOFFCanvas.Modified()
 VFATOFFCanvas.Update()
+ExclusionSummaryCanvas.Modified()
+ExclusionSummaryCanvas.Update()
 
 TH1nbins = 120
 TH2nbins = 200
@@ -134,7 +156,8 @@ THSanityChecks = {'Occupancy':{},
                   'PropHit_DirLoc_xOnGE11':{'BeforeMatching':{'Long':{},'Short':{}},
                                             'AfterMatching':{'Long':{},'Short':{}}
                                             },
-                  'RecHitperStrip':{}
+                  'RecHitperStrip':{},
+                  'NEvts':ROOT.TH1F("NumberOfAnalyzedEVTs","NumberOfAnalyzedEVTs",100,1,1)
                 }
 
 TH1MetaData = { 'isFiducialCut':[],
@@ -171,7 +194,7 @@ TH1MetaData['minME3Hit'].Fill(minME3Hit)
 TH1MetaData['minME4Hit'].Fill(minME4Hit)
 TH1MetaData['chamberOFFCanvas']=chamberOFFCanvas
 TH1MetaData['VFATOFFCanvas']=VFATOFFCanvas
-
+TH1MetaData['ExclusionSummaryCanvas']=ExclusionSummaryCanvas
 
 
 
@@ -215,6 +238,7 @@ for key in ['ML1','ML2','PL1','PL2']:
         chID = 'GE11-'+key[0]+'-%02d' % ch + key[1:]+"-"+size 
         THSanityChecks['RecHitperStrip'][key][ch] = ROOT.TH2F(chID,chID,384,-0.5,383.5,10,-0.5,9.5)
         THSanityChecks['RecHitperStrip'][key][ch].SetStats(0)
+        THSanityChecks['RecHitperStrip'][key][ch].SetMaximum(600)
         THSanityChecks['RecHitperStrip'][key][ch].GetXaxis().SetTitle("StripNumber")
         THSanityChecks['RecHitperStrip'][key][ch].GetYaxis().SetTitle("EtaPartition")
 
@@ -306,12 +330,12 @@ for fl in files:
 
 chainEntries = chain.GetEntries()
 
-
+print "Analyzing ", chainEntries," evts"
+THSanityChecks['NEvts'].Fill(chainEntries)
 for chain_index,evt in enumerate(chain):
     
     if chain_index % 40000 ==0:
-        print round(float(chain_index)/float(chainEntries),3)*100,"%"
-
+        print "[",time.strftime("%B %d - %H:%M:%S"),"]\t",round(float(chain_index)/float(chainEntries),3)*100,"%"
     n_gemprop = len(evt.mu_propagated_chamber)
     n_gemrec = len(evt.gemRecHit_chamber)
     
@@ -320,21 +344,16 @@ for chain_index,evt in enumerate(chain):
     THSanityChecks['NHits']['BeforeMatching']['PerEVT']['Reco'].Fill(n_gemrec)
     
 
-    ## Discard null entries
-    if n_gemprop==0:
+    # If FullDigis == True, never skip evts
+    # If FullDigis == False, skip evts with 0 propagations
+    if FD == False and n_gemprop==0:
         continue
 
 
-    ML1_NGEMRecoHits = sum( [1 for RecHit_index in range(0,n_gemrec) if evt.gemRecHit_region[RecHit_index] == -1 and evt.gemRecHit_layer[RecHit_index] == 1 and evt.gemRecHit_region[RecHit_index]*(100*evt.gemRecHit_chamber[RecHit_index]+10*evt.gemRecHit_layer[RecHit_index]+evt.gemRecHit_etaPartition[RecHit_index]) not in noisyEtaPID ] )
-    ML2_NGEMRecoHits = sum( [1 for RecHit_index in range(0,n_gemrec) if evt.gemRecHit_region[RecHit_index] == -1 and evt.gemRecHit_layer[RecHit_index] == 2 and evt.gemRecHit_region[RecHit_index]*(100*evt.gemRecHit_chamber[RecHit_index]+10*evt.gemRecHit_layer[RecHit_index]+evt.gemRecHit_etaPartition[RecHit_index]) not in noisyEtaPID ] )
-    PL1_NGEMRecoHits = sum( [1 for RecHit_index in range(0,n_gemrec) if evt.gemRecHit_region[RecHit_index] == 1 and evt.gemRecHit_layer[RecHit_index] == 1 and evt.gemRecHit_region[RecHit_index]*(100*evt.gemRecHit_chamber[RecHit_index]+10*evt.gemRecHit_layer[RecHit_index]+evt.gemRecHit_etaPartition[RecHit_index]) not in noisyEtaPID ] )
-    PL2_NGEMRecoHits = sum( [1 for RecHit_index in range(0,n_gemrec) if evt.gemRecHit_region[RecHit_index] == 1 and evt.gemRecHit_layer[RecHit_index] == 2 and evt.gemRecHit_region[RecHit_index]*(100*evt.gemRecHit_chamber[RecHit_index]+10*evt.gemRecHit_layer[RecHit_index]+evt.gemRecHit_etaPartition[RecHit_index]) not in noisyEtaPID ] )
-
-    THSanityChecks['NHits']['BeforeMatching']['ML1'].Fill(ML1_NGEMRecoHits)
-    THSanityChecks['NHits']['BeforeMatching']['ML2'].Fill(ML2_NGEMRecoHits)
-    THSanityChecks['NHits']['BeforeMatching']['PL1'].Fill(PL1_NGEMRecoHits)
-    THSanityChecks['NHits']['BeforeMatching']['PL2'].Fill(PL2_NGEMRecoHits)
-
+    ML1_NGEMRecoHits = 0
+    ML2_NGEMRecoHits = 0
+    PL1_NGEMRecoHits = 0
+    PL2_NGEMRecoHits = 0    
     
     RecHit_Dict = {}
     PropHit_Dict = {}
@@ -351,13 +370,30 @@ for chain_index,evt in enumerate(chain):
         if [region,chamber,layer] in chamberNumberOFF:
             continue
 
+        rec_glb_r = evt.gemRecHit_g_r[RecHit_index]
+        rec_loc_x = evt.gemRecHit_loc_x[RecHit_index]
+
+        if RecHitEtaPartitionID in VFATOFFDict:
+            if propHit2VFAT(rec_glb_r,rec_loc_x,etaP) in VFATOFFDict[RecHitEtaPartitionID]:
+                continue
+
+        if region == 1:
+            if layer == 1:
+                PL1_NGEMRecoHits += 1 
+            else:
+                PL2_NGEMRecoHits += 1 
+        if region == -1:
+            if layer == 1:
+                ML1_NGEMRecoHits += 1 
+            else:
+                ML2_NGEMRecoHits += 1 
 
         RecHit_Dict.setdefault(RecHitEtaPartitionID, {'loc_x':[],'glb_x':[],'glb_y':[],'glb_z':[],'glb_r':[],'glb_phi':[],'firstStrip':[],'cluster_size':[]})
-        RecHit_Dict[RecHitEtaPartitionID]['loc_x'].append(evt.gemRecHit_loc_x[RecHit_index])
+        RecHit_Dict[RecHitEtaPartitionID]['loc_x'].append(rec_loc_x)
         RecHit_Dict[RecHitEtaPartitionID]['glb_x'].append(evt.gemRecHit_g_x[RecHit_index])
         RecHit_Dict[RecHitEtaPartitionID]['glb_y'].append(evt.gemRecHit_g_y[RecHit_index])
         RecHit_Dict[RecHitEtaPartitionID]['glb_z'].append(evt.gemRecHit_g_z[RecHit_index])
-        RecHit_Dict[RecHitEtaPartitionID]['glb_r'].append(evt.gemRecHit_g_r[RecHit_index])
+        RecHit_Dict[RecHitEtaPartitionID]['glb_r'].append(rec_glb_r)
         RecHit_Dict[RecHitEtaPartitionID]['glb_phi'].append(evt.gemRecHit_g_phi[RecHit_index])
         RecHit_Dict[RecHitEtaPartitionID]['firstStrip'].append(evt.gemRecHit_firstClusterStrip[RecHit_index])
         RecHit_Dict[RecHitEtaPartitionID]['cluster_size'].append(evt.gemRecHit_cluster_size[RecHit_index])
@@ -369,8 +405,10 @@ for chain_index,evt in enumerate(chain):
             strip = RecHit_Dict[RecHitEtaPartitionID]['firstStrip'][-1] + j
             THSanityChecks['RecHitperStrip'][endcapKey][chamber].Fill(strip,etaP)
                     
-
-        
+    THSanityChecks['NHits']['BeforeMatching']['ML1'].Fill(ML1_NGEMRecoHits)
+    THSanityChecks['NHits']['BeforeMatching']['ML2'].Fill(ML2_NGEMRecoHits)
+    THSanityChecks['NHits']['BeforeMatching']['PL1'].Fill(PL1_NGEMRecoHits)
+    THSanityChecks['NHits']['BeforeMatching']['PL2'].Fill(PL2_NGEMRecoHits)    
     
     for PropHit_index in range(0,n_gemprop):
         
@@ -386,14 +424,14 @@ for chain_index,evt in enumerate(chain):
         outermost_z = evt.mu_propagated_Outermost_z[PropHit_index]
         is_incoming = evt.mu_isincoming[PropHit_index]
 
+        if region == 1 and outermost_z < 0:
+            continue
+        if region == -1 and outermost_z > 0:
+            continue
+
         ## discard chambers that were kept OFF from the analysis
         if [region,chamber,layer] in chamberNumberOFF:
             continue
-
-        # if region == 1 and outermost_z < 0:
-        #     continue
-        # if region == -1 and outermost_z > 0:
-        #     continue
 
         propHitFromME11 = bool(evt.mu_propagated_isME11[PropHit_index])
         if propHitFromME11:
@@ -725,7 +763,7 @@ subprocess.call(["mkdir", "-p", "./Plot/"+timestamp+"/"+"glb_rdphi/"])
 
 OutF = ROOT.TFile("./"+timestamp+".root","RECREATE")
 
-writeToTFile(OutF,test,"SanityChecks/AngleDirCorrelation/")
+writeToTFile(OutF,THSanityChecks['NEvts'],"SanityChecks/NumberOfEVTs/")
 
 writeToTFile(OutF,THSanityChecks['NHits']['BeforeMatching']['PerEVT']['Reco'],"SanityChecks/NHits/BeforeMatching/")
 writeToTFile(OutF,THSanityChecks['NHits']['BeforeMatching']['PerEVT']['Prop'],"SanityChecks/NHits/BeforeMatching/")
@@ -748,6 +786,8 @@ writeToTFile(OutF,THSanityChecks['Occupancy']['BeforeMatching']['Prop'],"SanityC
 writeToTFile(OutF,THSanityChecks['Occupancy']['BeforeMatching']['PropLocalLong'],"SanityChecks/Occupancy/BeforeMatching")
 writeToTFile(OutF,THSanityChecks['Occupancy']['BeforeMatching']['PropLocalShort'],"SanityChecks/Occupancy/BeforeMatching")
 writeToTFile(OutF,THSanityChecks['Occupancy']['BeforeMatching']['Reco'],"SanityChecks/Occupancy/BeforeMatching")
+
+writeToTFile(OutF,test,"SanityChecks/AngleDirCorrelation/")
 
 for key in ['ML1','ML2','PL1','PL2']:
     writeToTFile(OutF,THSanityChecks['Occupancy']['BeforeMatching'][key]['PropHits'],"SanityChecks/Occupancy/BeforeMatching/"+key)

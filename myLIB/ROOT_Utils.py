@@ -38,6 +38,13 @@ def GetROOTType(obj):
         return ("(TFitResult)")
     elif type_found == ROOT.TGraphErrors:
         return ("(TFitResult)")
+    elif type_found == ROOT.TH1F:
+        return ("(TH1F)")
+    elif type_found == ROOT.TH2F:
+        return ("(TH2F)")
+    elif type_found == ROOT.TGraphAsymmErrors:
+        return ("(TGraphAsymmErrors)")
+        
 
     else:
         print type_found
