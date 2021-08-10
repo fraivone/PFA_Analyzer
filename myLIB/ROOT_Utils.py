@@ -8,9 +8,6 @@ import math
 import xlrd
 import sys
 import fnmatch
-### Let's add some more from different folder
-framework = os.path.expandvars('$REPO_HOME')
-sys.path.insert(1, framework+'/Analysis/AnaLib/')
 import CMS_lumi, tdrstyle
 import collections
 

@@ -62,7 +62,7 @@ Many other options can be provided as input (e.g STA chi2 cut, fiducial cuts val
 
 #### Merging runs
 
-To achieve better statistics you want to analyze many sets of GEM NTuples coming from different runs. Let's supposed they are all [compatible](#Compatibility) with this analyzer release and stored in:
+To achieve better statistics you want to analyze many sets of GEM NTuples coming from different runs. Let's suppose they are all [compatible](#Compatibility) with this analyzer release and stored in:
 ##### Required Inputs
 * /A/B/C/Run1/
 * /A/B/C/Run2/
