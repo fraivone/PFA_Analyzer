@@ -205,7 +205,7 @@ def getTFileFitResult(dictMap, fitobjName):
 
 def setUpCanvas(canvasName="canvas",W_input=None,H_input=None):
     CMS_lumi.writeExtraText = 1
-    #CMS_lumi.extraText = "Private Study"
+    CMS_lumi.extraText = "CMS Preliminary"
 
 
     iPos = 0

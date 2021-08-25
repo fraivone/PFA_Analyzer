@@ -15,19 +15,19 @@ lib_folder = os.path.expandvars('$myLIB')
 sys.path.insert(1, lib_folder)
 try:
     from ROOT_Utils import *
-    
-
 except:
-  print("ERROR:\n\tCan't find the package CMS_lumi and tdrstlye\n\tPlease verify that this file are placed in the path $myLIB/ROOT_Utils/ \n\tAdditionally keep in mind to export the environmental variable $myLIB\nEXITING...\n") 
+  print("ERROR:\n\tCan't find the module ROOT_Utils...Have you source setup.sh?\n\tPlease verify that ROOT_Utils.py is under $myLIB/ \n\nEXITING...\n") 
   sys.exit(0)
+
 try:
     from PFA_Analyzer_Utils import *
 except:
-    print ("ERROR:\n\tCan't find the package PFA_Analyzer_Utils\nEXITING...\n")
+    print ("ERROR:\n\tCan't find the package PFA_Analyzer_Utils......Have you source setup.sh?\n\tPlease verify that ROOT_Utils.py is under $myLIB/ \n\nEXITING...\n")
     sys.exit(0)
 
+
 parser = argparse.ArgumentParser(
-        description='''Scripts that: \n\t-Reads the GEMMuonNtuple\n\t-Plot Sanity Checks\n\t-Plot Residuals (takes the cut as parameter)\n\t-Plot efficiency\nCurrently allows the track matching on glb_phi and glb_rdphi''',
+        description='''Scripts that: \n\t-Reads the GEMMuonNtuple\n\t-Plot Sanity Checks\n\t-Plot Residuals (takes the cut as parameter)\n\t-Plot efficiency\nCurrently allows the hits matching on glb_phi and glb_rdphi''',
         epilog="""Typical exectuion\n\t python Analysis_lxplus.py  --phi_cut 0.001 --rdphi_cut 0.15""",
         formatter_class=RawTextHelpFormatter
 )

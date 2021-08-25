@@ -98,7 +98,7 @@ def importOFFVFAT(list_of_file_path,chamberNumberOFF):
 
         off_VFAT = {}
         for index, row in df.iterrows():
-            region =  -1 if row['region']=='N' else (1 if row['region']=='P' else None)
+            region =  -1 if ( row['region']=='N' or row['region']=='M') else (1 if row['region']=='P' else None) ## In the past N was used... currently M indicates the minus endcap
             layer = int(row['layer'])
             chamber = int(row['chamber'])
             VFAT = int(row['VFAT'])

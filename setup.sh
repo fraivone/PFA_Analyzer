@@ -1,3 +1,3 @@
 #!/bin/sh 
-export myLIB='./myLIB'
-echo "myLIB env variable has been set"
+export myLIB='./lib/'
+echo "myLIB variable has been set"

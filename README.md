@@ -24,7 +24,7 @@ Repository aimed to host the code to analyze the [GEM Common Muon NTuples](https
 
 ### Installation
 ```
-git clone https://github.com/fraivone/PFA_Analyzer.git
+git clone https://github.com/gem-sw/pfa.git
 cd PFA_Analyzer
 source setup.sh
 ```
@@ -122,9 +122,11 @@ When the boolean option DLE is provided, the analysis will produce an additional
 When the option DLE is selected, the efficiency is still evaluated in the classical way. However only the events containing STA tracks with exactly 2 PropHits ( 1 for each layer of the same SC) are considered. So you do care because it lowers down the statistics.
 
 #### Full Digis (FD)
-This analysis uses the propagated hits coming from reconstructed STA muons as a test for our GEMs. If in an event there are propagated hits on GEM, the events is discarded. This allows to speed up the processing of the data, but ignores the RecHit data  associated with the event.
+This analysis uses the propagated hits coming from reconstructed STA muons to probe GEMs performance. 
+Therefore events without propagated hits on GEM are not processed. This allows to speed up the analysis of the data, but ignores the RecHit data associated with the event.
 
-When the boolean option --FD is provided, no events are ignored and GEM digis are collected even for events without propagated hits. The processing time can easily become huge.
+When the boolean option --FD is provided, no events are ignored and GEM digis are collected and stored in the SanityChekc plots even for events without propagated hits. 
+The processing time increases.
 
 ### Output
 A typical output file is [./day19_344063_660uA.root](./day19_344063_660uA.root)
