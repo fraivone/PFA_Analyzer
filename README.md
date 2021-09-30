@@ -1,20 +1,20 @@
-* [Installation](#installation)
-* [Single Run Usage](#single-run-usage)
-  * [Required Inputs](#required-inputs)
-  * [Optional Inputs (some of them)](#optional-inputs--some-of-them-)
-* [Multi Run Usage](#multi-run-usage)
-  * [Required Inputs](#required-inputs-1)
-  * [Optional Inputs (some of them)](#optional-inputs--some-of-them--1)
-* [Nuts and bolts](#nuts-and-bolts)
-* [Special Features](#special-features)
-  * [Double Layer Efficiency (DLE)](#double-layer-efficiency--dle-)
-  * [Full Digis (FD)](#full-digis--fd-)
-* [Output](#output)
-* [Compatibility](#compatibility)
+  * [Installation](#installation)
+  * [Single Run Usage](#single-run-usage)
+    * [Required Inputs](#required-inputs)
+    * [Optional Inputs (some of them)](#optional-inputs--some-of-them-)
+  * [Multi Run Usage](#multi-run-usage)
+    * [Required Inputs](#required-inputs-1)
+    * [Optional Inputs (some of them)](#optional-inputs--some-of-them--1)
+  * [Nuts and bolts](#nuts-and-bolts)
+  * [Special Features](#special-features)
+    * [Double Layer Efficiency (DLE)](#double-layer-efficiency--dle-)
+    * [Full Digis (FD)](#full-digis--fd-)
+  * [Output](#output)
+  * [Compatibility](#compatibility)
 * [Helper Scripts](#helper-scripts)
-      - [HVScan_Plotter](#hvscan-plotter)
-      - [CompareCSV](#comparecsv)
-      - [RunMerger](#runmerger)
+  * [HVScan_Plotter](#hvscan-plotter)
+  * [CompareCSV](#comparecsv)
+  * [RunMerger](#runmerger)
 
 
 
@@ -180,7 +180,7 @@
   These scripts take as input the PFA_Analyzer output files.
   They have to be executed from the base folder.
 
-  #### HVScan_Plotter
+  ### HVScan_Plotter
   Given *n* output file tags from PFA_Analyzer and *n* values for the HV, the script produces 144 Efficiency vs HighVoltage plots ([example](./Output/HVScan/GE11-P-12L1-L.pdf)).
 
   **Typical excution**:
@@ -189,7 +189,7 @@
   ```
   The option `--GMM` adds an extra plot, developed for a GMM presentation
 
-  #### CompareCSV
+  ### CompareCSV
   Given *n* output file tags from PFA_Analyzer, prouces a single efficiency summary plot of different runs, starting from csv file.
 
   **Typical excution**:
@@ -199,7 +199,7 @@
   The option `--labels` can be used to specifiy label names in the legend.
   The option `--THR` enables THR comparison plot on the secondary y axis.s
 
-  #### RunMerger
+  ### RunMerger
   Given *n* output file tags from PFA_Analyzer merges them in a single `.csv file`. The idea is that many runs can be merged to extract the AVG efficiency without having to re-analyze the NTuples.
   
   **REQUIRES** output file tags to be in the format `day<N>_<runNumber>_<EqDivdCurr>uA`
