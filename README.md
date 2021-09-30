@@ -1,23 +1,22 @@
-- [PFA_Analyzer](#pfa-analyzer)
-  * [Installation](#installation)
-  * [Single Run Usage](#single-run-usage)
-        * [Required Inputs](#required-inputs)
-        * [Optional Inputs (some of them)](#optional-inputs--some-of-them-)
-  * [Multi Run Usage](#multi-run-usage)
-        * [Required Inputs](#required-inputs-1)
-        * [Optional Inputs (some of them)](#optional-inputs--some-of-them--1)
-  * [Nuts and bolts](#nuts-and-bolts)
-  * [Special Features](#special-features)
-      - [Double Layer Efficiency (DLE)](#double-layer-efficiency--dle-)
-      - [Full Digis (FD)](#full-digis--fd-)
-    + [Output](#output)
-    + [Compatibility](#compatibility)
-- [Helper Scripts](#helper-scripts)
+* [Installation](#installation)
+* [Single Run Usage](#single-run-usage)
+  * [Required Inputs](#required-inputs)
+  * [Optional Inputs (some of them)](#optional-inputs--some-of-them-)
+* [Multi Run Usage](#multi-run-usage)
+  * [Required Inputs](#required-inputs-1)
+  * [Optional Inputs (some of them)](#optional-inputs--some-of-them--1)
+* [Nuts and bolts](#nuts-and-bolts)
+* [Special Features](#special-features)
+  * [Double Layer Efficiency (DLE)](#double-layer-efficiency--dle-)
+  * [Full Digis (FD)](#full-digis--fd-)
+* [Output](#output)
+* [Compatibility](#compatibility)
+* [Helper Scripts](#helper-scripts)
       - [HVScan_Plotter](#hvscan-plotter)
       - [CompareCSV](#comparecsv)
       - [RunMerger](#runmerger)
 
-<small><i><a href='http://ecotrust-canada.github.io/markdown-toc/'>Table of contents generated with markdown-toc</a></i></small>
+
 
 
 
@@ -33,6 +32,7 @@
   source setup.sh
   ```
   ## Single Run Usage
+
   ##### Required Inputs
   * Set of [compatible](#Compatibility) GEM NTuples related to your run, stored under `/eos/cms/store/group/dpg_gem/comm_gem/P5_Commissioning/2021/GEMCommonNtuples/CRUZET/<RunName>`
 
@@ -64,6 +64,7 @@
 
 
   ## Multi Run Usage
+
   ##### Required Inputs
   To achieve higher statistics many sets of GEM NTuples coming from different runs can be analyzed (see also [RunMerger](#runmerger)). Let's suppose they are all [compatible](#Compatibility) with this analyzer release and stored under:
   * `/eos/cms/store/group/dpg_gem/comm_gem/P5_Commissioning/2021/GEMCommonNtuples/CRUZET/Run1`
@@ -137,7 +138,7 @@
   When the boolean option --FD is provided, no events are ignored and GEM digis are collected and stored in the SanityChekc plots even for events without propagated hits. 
   The processing time increases.
 
-  ### Output
+  ## Output
   The output consists of three data types: 
   * `.root` under `./Output/PFA_Analyzer_Output/ROOT_File`
   * `.csv`  under `./Output/PFA_Analyzer_Output/CSV`
@@ -163,14 +164,14 @@
   outputname.root // yyMMdd_hhmm.root
   ```
 
-  ### Compatibility 
+  ## Compatibility 
   Compatible with GEM Common Ntuples produced with the release 
   ```
   2021_MWGR4_v2
   ```
 
 
-# Helper Scripts
+  # Helper Scripts
   A set of additional scripts has been developed to help plotting/merging/comparing efficiency and thresholds from different runs.
   * `HVScan_Plotter.py`
   * `CompareCSV.py`
