@@ -3,6 +3,7 @@ import numpy
 import pandas as pd
 from ROOT_Utils import *
 import sys
+import json
 
 
 
@@ -39,6 +40,22 @@ def importOFFChamber(list_of_file_path):
             sys.exit(0)
     
     return chamberNumberOFF
+
+
+
+## Expects to have a list of file paths each containing a list of "GE11-*-XXLY" to be excluded
+def ChamberOFF_byLS(file_path):
+    try:
+        io = open(file_path[0],"r")
+        dictionary = json.load(io)  
+    except IOError:
+            print "Couldn't open file : "+file_path+"\nExiting .."
+            sys.exit(0)
+
+    for key,item in dictionary.items():
+        if item == []:
+            dictionary.pop(key)
+    return dictionary
 
 def VFAT2iEta_iPhi(VFATN):
     try:
@@ -109,9 +126,10 @@ def importOFFVFAT(list_of_file_path,chamberNumberOFF):
             ## Avoid to fill VFAT for which the entire chamber is OFF
             if [region,chamber,layer] in chamberNumberOFF:
                 continue
-            ## If the key doesn't exsist create it. Pass otherwise
-            off_VFAT.setdefault(etaPartitionID,[])
-            off_VFAT[etaPartitionID].append(VFAT)
+            ## If the key doesn't exsist create it, then fill the list
+            if maskReason == 1:
+                off_VFAT.setdefault(etaPartitionID,[])
+                off_VFAT[etaPartitionID].append(VFAT)
     
     ## Removing duplicates
     for key, value in off_VFAT.items():
@@ -119,6 +137,10 @@ def importOFFVFAT(list_of_file_path,chamberNumberOFF):
     return off_VFAT
 
 def chamberName2ReChLa(chamberName):
+    ## Accepts as input either 
+        # GE11-M-03L1 or GE11-M-03L1-S
+    if len(chamberName)==13:
+        chamberName = chamberName[:11]
     re = -1 if "M" in chamberName else 1
     ch = int( chamberName.split("-")[-1][:2] )
     la = int( chamberName.split("-")[-1][-1] )
@@ -130,6 +152,11 @@ def ReChLa2chamberName(re,ch,la):
     size = "S" if ch%2 == 1 else "L"
     chID = 'GE11-'+endcap+'-%02d' % ch +"L"+str(la)+"-"+size 
     return chID
+
+def EndcapLayer2label(re,layer):
+    label = "ML" if re == -1 else "PL"
+    return label+str(layer)
+    
 
 def ChambersOFFHisto(chamberNumberOFF):
     GE11_OFF = {-1:{},1:{}}
@@ -218,9 +245,9 @@ def incidenceAngle_vs_Eff(sourceDict,input_region=1,input_layer=1):
 
     title = "GE11"+reg_tag_string+lay_tag_string
     angle_nbins,angle_min,angle_max = 10,0,1.
-    eff_nbins, eff_min,eff_max = 40, 0.0, 1.2
-
-    Eff_Plot = ROOT.TGraphAsymmErrors(title+"_incidenceAngle_Eff",title+"_incidenceAngle_Eff")
+    
+    
+    Eff_Plot = ROOT.TGraphAsymmErrors()
     NumTH1F = ROOT.TH1F(title+"_incidenceAngle_Num",title+"_incidenceAngle_Num",angle_nbins,angle_min,angle_max)
     DenTH1F = ROOT.TH1F(title+"_incidenceAngle_Den",title+"_incidenceAngle_Den",angle_nbins,angle_min,angle_max)
         
@@ -244,6 +271,7 @@ def incidenceAngle_vs_Eff(sourceDict,input_region=1,input_layer=1):
     Eff_Plot.SetName(title+"_incidenceAngle_Eff")
     Eff_Plot.GetXaxis().SetTitle("Cos(#alpha)")
     Eff_Plot.GetYaxis().SetTitle("Efficiency")
+    
     return NumTH1F, DenTH1F, Eff_Plot
 
 
@@ -479,7 +507,7 @@ def generateEfficiencyDistribution(sourceDict):
 
             
 
-def generateEfficiencyPlot2DGE11(sourceDict,input_region=1,input_layer=1):
+def generateEfficiencyPlot2DGE11(sourceDict,input_region=1,input_layer=1,debug=False):
     ## Transforming in list
     reg_tag_string = "All" if isinstance(input_region, list) else "P" if input_region == 1 else "M"
     lay_tag_string = "" if isinstance(input_layer, list) else "L1" if input_layer == 1 else "L2"
@@ -526,7 +554,7 @@ def generateEfficiencyPlot2DGE11(sourceDict,input_region=1,input_layer=1):
         try:
             eta_efficiency = round(float(etaPartitionRecHits)/float(etaPartitionPropHits),2)
         except:
-            print "Warning on Re,Ch,La,etaP = ", region,chamber,layer,eta, "\tDenominator is 0"
+            if debug:print "Warning on Re,Ch,La,etaP = ", region,chamber,layer,eta, "\tDenominator is 0"
             eta_efficiency = 0
             N+=1
 
@@ -633,21 +661,21 @@ def GetStripGeometry():
     return stripGeometryDict
 
 
-def printSummary(sourceDict,matching_variables,ResidualCutOff,matching_variable_units):
+def printSummary(sourceDict,matching_variables,ResidualCutOff,matching_variable_units,debug=False):
     for matching_variable in matching_variables:
         print "\n\n#############\nSUMMARY\n#############\nMatchingVariable = "+matching_variable+"\nCutoff = ",ResidualCutOff[matching_variable],matching_variable_units[matching_variable],"\n"
         for eta in range(1,9):
             num = sum([sourceDict[matching_variable][key][k]['num'] for key in sourceDict[matching_variable].keys() for k in range(0,11) if abs(key)%10 == eta])
             den = sum([sourceDict[matching_variable][key][k]['den'] for key in sourceDict[matching_variable].keys() for k in range(0,11) if abs(key)%10 == eta])
             try:
-                print "Efficiency GE11 ETA"+str(eta)+"  ==> ", num , "/",den, " = ", float(num)/float(den)
+                print "Efficiency GE11 ETA"+str(eta)+"  ==> ", num , "/",den, "\t = ", round(float(num)/float(den),3)
             except:
                 print "EtaP = ",str(eta)," has no propagated hits..."
 
         num = sum([sourceDict[matching_variable][key][k]['num'] for key in sourceDict[matching_variable].keys() for k in range(0,11)])
         den = sum([sourceDict[matching_variable][key][k]['den'] for key in sourceDict[matching_variable].keys() for k in range(0,11)])
         try:
-            print "Efficiency GE11  ==> ", num , "/",den, " = ", float(num)/float(den)
+            print "Efficiency GE11       ==> ", num , "/",den, "\t = ", round(float(num)/float(den),3)
         except:
-            print "WARNING"
+            if debug: print "WARNING"
         print "#############"

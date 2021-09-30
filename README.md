@@ -31,7 +31,7 @@ source setup.sh
 ### Usage
 #### Single run
 ##### Required Inputs
-* Set of [compatible](#Compatibility) GEM NTuples related to your run, stored under */A/B/C/*
+* Set of [compatible](#Compatibility) GEM NTuples related to your run, stored under `/eos/cms/store/group/dpg_gem/comm_gem/P5_Commissioning/2021/GEMCommonNtuples/CRUZET/<RunName>`
 
 ##### Optional Inputs (some of them)
 * List of chambers to be masked ([./ChamberOFF_Example.txt](./ExcludeMe/ChamberOFF_CRUZET_342728.txt)) cause were OFF/Tripped/inError during the run
@@ -40,10 +40,10 @@ source setup.sh
 
 By executing
 ```
-python PFA_Analyzer.py --dataset /A/B/C/ --chamberOFF ./ChamberOFF_Example.txt  --VFATOFF ./ListOfDeadVFAT_Example.txt -pc 0.02 -rdpc 4  --outputname myOutput
+python PFA_Analyzer.py --dataset <RunName> --chamberOFF ./ChamberOFF_Example.txt  --VFATOFF ./ListOfDeadVFAT_Example.txt -pc 0.02 -rdpc 4  --outputname myOutput
 ```
 
-the GEM NTuples stored in */A/B/C/* will be anlyzed using 
+the GEM NTuples stored in `/eos/cms/store/group/dpg_gem/comm_gem/P5_Commissioning/2021/GEMCommonNtuples/CRUZET/<RunName>` will be anlyzed using 
 * pc = 0.02 rad  &emsp;&emsp; is the "φ cut" value, the max angular distance between RecHit and PropHit to allow matching
 * rdpc = 4 cm   &emsp;&emsp;is the "RΔφ cut" value, the max distance (in cm) between RecHit and PropHit  to allow matching
 
@@ -64,9 +64,9 @@ Many other options can be provided as input (e.g STA chi2 cut, fiducial cuts val
 
 To achieve better statistics you want to analyze many sets of GEM NTuples coming from different runs. Let's suppose they are all [compatible](#Compatibility) with this analyzer release and stored in:
 ##### Required Inputs
-* /A/B/C/Run1/
-* /A/B/C/Run2/
-* /A/B/C/Run3/
+* Run1
+* Run2
+* Run3
 
 ##### Optional Inputs (some of them)
 Let's suppose you have a list of chamber OFF for each of this run:
@@ -77,10 +77,17 @@ Let's suppose you have a list of VFAT OFF for each of this run:
 
 By executing
 ```
-python PFA_Analyzer.py --dataset /A/B/C/Run1/ /A/B/C/Run2/ /A/B/C/Run3/ --chamberOFF ./ChamberOFF_Run_1.txt ./ChamberOFF_Run_2.txt ./ChamberOFF_Run_3.txt --VFATOFF ./ListOfDeadVFAT_Run_1.txt ./ListOfDeadVFAT_Run_2.txt ./ListOfDeadVFAT_Run_3.txt -pc 0.02 -rdpc 4  --outputname myOutput
+python PFA_Analyzer.py --dataset Run1 Run2 Run3 --chamberOFF ./ChamberOFF_Run_1.txt ./ChamberOFF_Run_2.txt ./ChamberOFF_Run_3.txt --VFATOFF ./ListOfDeadVFAT_Run_1.txt ./ListOfDeadVFAT_Run_2.txt ./ListOfDeadVFAT_Run_3.txt -pc 0.02 -rdpc 4  --outputname myOutput
 ```
 
-the GEM NTuples stored in /A/B/C/Run1/, /A/B/C/Run2/, /A/B/C/Run3/ will be merged together and anlyzed using :
+the GEM NTuples stored in 
+
+```
+/eos/cms/store/group/dpg_gem/comm_gem/P5_Commissioning/2021/GEMCommonNtuples/CRUZET/Run1
+/eos/cms/store/group/dpg_gem/comm_gem/P5_Commissioning/2021/GEMCommonNtuples/CRUZET/Run2 
+/eos/cms/store/group/dpg_gem/comm_gem/P5_Commissioning/2021/GEMCommonNtuples/CRUZET/Run3
+```
+will be merged together and anlyzed using :
 * pc = 0.02 rad  &emsp;&emsp; is the "φ cut" value, the max angular distance between RecHit and PropHit to allow matching
 * rdpc = 4 cm   &emsp;&emsp;is the "RΔφ cut" value, the max distance (in cm) between RecHit and PropHit  to allow matching
 

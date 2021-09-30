@@ -1,34 +1,18 @@
 import ROOT
-import csv
-import os.path
-from os import mkdir
 import subprocess
 import numpy as np
-import math
-import sys
 import time
+import re as regularExpression
 import argparse
 import pandas as pd
 from argparse import RawTextHelpFormatter
-### Let's add some more from different folder
-lib_folder = os.path.expandvars('$myLIB')
-sys.path.insert(1, lib_folder)
-try:
-    from ROOT_Utils import *
-except:
-  print("ERROR:\n\tCan't find the module ROOT_Utils...Have you source setup.sh?\n\tPlease verify that ROOT_Utils.py is under $myLIB/ \n\nEXITING...\n") 
-  sys.exit(0)
-
-try:
-    from PFA_Analyzer_Utils import *
-except:
-    print ("ERROR:\n\tCan't find the package PFA_Analyzer_Utils......Have you source setup.sh?\n\tPlease verify that ROOT_Utils.py is under $myLIB/ \n\nEXITING...\n")
-    sys.exit(0)
+from lib.ROOT_Utils import *
+from lib.PFA_Analyzer_Utils import *
 
 
 parser = argparse.ArgumentParser(
         description='''Scripts that: \n\t-Reads the GEMMuonNtuple\n\t-Plot Sanity Checks\n\t-Plot Residuals (takes the cut as parameter)\n\t-Plot efficiency\nCurrently allows the hits matching on glb_phi and glb_rdphi''',
-        epilog="""Typical exectuion\n\t python Analysis_lxplus.py  --phi_cut 0.001 --rdphi_cut 0.15""",
+        epilog="""Typical exectuion\n\t python PFA_Analyzer.py  --phi_cut 0.001 --rdphi_cut 0.15""",
         formatter_class=RawTextHelpFormatter
 )
 
@@ -42,6 +26,7 @@ parser.add_argument('--fiducialR','-fR', type=float , help="fiducial cut along R
 parser.add_argument('--fiducialPhi','-fP', type=float , help="fiducial cut along phi axis",required=False)
 parser.add_argument('--DLE', default=False, action='store_true',help="Swtiches on the Double Layer Efficiency (DLE) analisys. False by default",required=False)
 parser.add_argument('--FD', default=False, action='store_true',help="When enabled, allows the storage of all GEM RecHit Digis. False by default, which means that GEM RecHit Digis are stored only for EVTs in which STA propagation hits GEM",required=False)
+parser.add_argument('--verbose', default=False, action='store_true',help="Verbose printing",required=False)
 parser.add_argument('--dataset','-ds', type=str,help="Path to the folder containing the NTuples to be analyzed",required=True,nargs='*')
 
 parser.add_argument('--minME1', type=int, help="Min number of ME1 hits",required=False)
@@ -62,13 +47,14 @@ args = parser.parse_args()
 
 
 ROOT.gROOT.SetBatch(True)
+if not args.verbose: ROOT.gROOT.ProcessLine("gErrorIgnoreLevel=2001;") #suppressed everything less-than-or-equal-to kWarning
 
 
 start_time = time.time()
 
 files = []
 for folder in args.dataset:
-    temp_files = files_in_folder(folder)
+    temp_files = files_in_folder("/eos/cms/store/group/dpg_gem/comm_gem/P5_Commissioning/2021/GEMCommonNtuples/CRUZET/"+folder)
     files += [f for f in temp_files if ".root" in f]
 
 matching_variables = ['glb_phi','glb_rdphi']
@@ -90,8 +76,9 @@ minME3Hit = args.minME3
 minME4Hit = args.minME4
 
 noisyEtaPID = []
-chamberNumberOFF = [] if args.chamberOFF is None else importOFFChamber(args.chamberOFF)
+chamberNumberOFF = [] #if args.chamberOFF is None else importOFFChamber(args.chamberOFF)
 VFATOFFDict = {} if args.VFATOFF is None else importOFFVFAT(args.VFATOFF,chamberNumberOFF)
+chamberOFFLS = {} if args.chamberOFF is None else ChamberOFF_byLS(args.chamberOFF)
 
 chamberOFFCanvas = setUpCanvas("ExcludedChambers",1200,1200)
 chamberOFFCanvas.Divide(2,2)
@@ -329,16 +316,22 @@ for fl in files:
     chain.Add(fl)
 
 chainEntries = chain.GetEntries()
+print "\n#############\nStarting\n#############"
+print "Analysing run(s): \t", [int(regularExpression.sub("[^0-9]", "", i)) for i in args.dataset]
 
-print "Analyzing ", chainEntries," evts"
+print "Number of evts \t\t%.2fM\n" %(round(float(chainEntries)/10**6,2))
 THSanityChecks['NEvts'].Fill(chainEntries)
 for chain_index,evt in enumerate(chain):
     
     if chain_index % 40000 ==0:
         print "[",time.strftime("%B %d - %H:%M:%S"),"]\t",round(float(chain_index)/float(chainEntries),3)*100,"%"
+        
     n_gemprop = len(evt.mu_propagated_chamber)
     n_gemrec = len(evt.gemRecHit_chamber)
     
+    EventNumber = evt.event_eventNumber
+    LumiSection = evt.event_lumiBlock
+    RunNumber = evt.event_runNumber
     
     THSanityChecks['NHits']['BeforeMatching']['PerEVT']['Prop'].Fill(n_gemprop)
     THSanityChecks['NHits']['BeforeMatching']['PerEVT']['Reco'].Fill(n_gemrec)
@@ -366,8 +359,10 @@ for chain_index,evt in enumerate(chain):
         RecHitEtaPartitionID = region*(100*chamber+10*layer+etaP)
         endcapKey = "PL"+str(layer) if region > 0 else "ML"+str(layer)
 
+
+        chamberID = ReChLa2chamberName(region,chamber,layer)
         ## discard chambers that were kept OFF from the analysis
-        if [region,chamber,layer] in chamberNumberOFF:
+        if chamberID in chamberOFFLS.keys() and (LumiSection in chamberOFFLS[chamberID] or -1 in chamberOFFLS[chamberID] ):
             continue
 
         rec_glb_r = evt.gemRecHit_g_r[RecHit_index]
@@ -429,8 +424,9 @@ for chain_index,evt in enumerate(chain):
         if region == -1 and outermost_z > 0:
             continue
 
+        chamberID = ReChLa2chamberName(region,chamber,layer)
         ## discard chambers that were kept OFF from the analysis
-        if [region,chamber,layer] in chamberNumberOFF:
+        if chamberID in chamberOFFLS.keys() and (LumiSection in chamberOFFLS[chamberID] or -1 in chamberOFFLS[chamberID] ):
             continue
 
         propHitFromME11 = bool(evt.mu_propagated_isME11[PropHit_index])
@@ -756,12 +752,14 @@ print("--- %s seconds ---" % (time.time() - start_time))
 ## Storing the results
 
 timestamp =  time.strftime("%-y%m%d_%H%M") if args.outputname is None else args.outputname
-subprocess.call(["mkdir", "-p", "./Plot/"+timestamp+"/"+"glb_phi/"])
-subprocess.call(["mkdir", "-p", "./Plot/"+timestamp+"/"+"glb_rdphi/"])
+subprocess.call(["mkdir", "-p", "./Output/PFA_Analyzer_Output/CSV/"+timestamp])
+subprocess.call(["mkdir", "-p", "./Output/PFA_Analyzer_Output/CSV/"+timestamp])
+subprocess.call(["mkdir", "-p", "./Output/PFA_Analyzer_Output/Plot/"+timestamp+"/"+"glb_phi/"])
+subprocess.call(["mkdir", "-p", "./Output/PFA_Analyzer_Output/Plot/"+timestamp+"/"+"glb_rdphi/"])
 
 
 
-OutF = ROOT.TFile("./"+timestamp+".root","RECREATE")
+OutF = ROOT.TFile("./Output/PFA_Analyzer_Output/ROOT_File/"+timestamp+".root","RECREATE")
 
 writeToTFile(OutF,THSanityChecks['NEvts'],"SanityChecks/NumberOfEVTs/")
 
@@ -841,7 +839,7 @@ for matchingVar in matching_variables:
         writeToTFile(OutF,TH2Fresidual_collector[matchingVar][chambers]['glb_phi']['TH2F'],"Residuals/MatchingOn_"+matchingVar+"/Residual_glb_phi")
         writeToTFile(OutF,TH2Fresidual_collector[matchingVar][chambers]['glb_rdphi']['TH2F'],"Residuals/MatchingOn_"+matchingVar+"/Residual_glb_rdphi")
 
-    efficiency2DPlotAll,Num2DAll,Den2DAll,SummaryAll = generateEfficiencyPlot2DGE11(EfficiencyDictGlobal[matchingVar],[-1,1],[1,2])
+    efficiency2DPlotAll,Num2DAll,Den2DAll,SummaryAll = generateEfficiencyPlot2DGE11(EfficiencyDictGlobal[matchingVar],[-1,1],[1,2],debug=args.verbose)
     EffiDistrAll = generateEfficiencyDistribution(EfficiencyDictGlobal[matchingVar])
     GE11efficiencyByEta_Short,GE11efficiencyByEta_Long,GE11efficiencyByEta_All = generateEfficiencyPlotbyEta(EfficiencyDictGlobal[matchingVar],[1,-1],[1,2])
     GE11efficiencyByPt_Short,GE11efficiencyByPt_Long,GE11efficiencyByPt_All = generateEfficiencyPlotbyPt(EfficiencyDictGlobal[matchingVar])
@@ -891,18 +889,9 @@ for matchingVar in matching_variables:
             efficiency2DPlot,Num2D,Den2D,Summary = generateEfficiencyPlot2DGE11(EfficiencyDictGlobal[matchingVar],r,l)
             efficiencyByEta_Short,efficiencyByEta_Long,efficiencyByEta_All =  generateEfficiencyPlotbyEta(EfficiencyDictGlobal[matchingVar],r,l)
                        
-            c1 = setUpCanvas("c1",2400,900)
+            c1 = setUpCanvas(matchingVar+"_"+reg_tag_string+lay_tag_string,2400,900)
             c1.SetLeftMargin(0.07)
             c1.SetRightMargin(0.09)
-            c2 = setUpCanvas("c2",2400,900)
-            c2.SetLeftMargin(0.07)
-            c2.SetRightMargin(0.09)
-            c3 = setUpCanvas("c3",2400,900)
-            c3.SetLeftMargin(0.07)
-            c3.SetRightMargin(0.09)
-            c4 = setUpCanvas("c4",2400,900)
-            c4.SetLeftMargin(0.08)
-            c4.SetRightMargin(0.04)
 
             writeToTFile(OutF,efficiency2DPlot,"Efficiency/"+matchingVar+"/2DView/"+reg_tag_string+lay_tag_string+"/")
             writeToTFile(OutF,Num2D,"Efficiency/"+matchingVar+"/2DView/"+reg_tag_string+lay_tag_string+"/")
@@ -921,29 +910,17 @@ for matchingVar in matching_variables:
                 writeToTFile(OutF,DLE_ByEta_Long,"Efficiency/DLE/ByEta/"+reg_tag_string+lay_tag_string+"/")
                 writeToTFile(OutF,DLE_ByEta_All,"Efficiency/DLE/ByEta/"+reg_tag_string+lay_tag_string+"/")
             
+            ## Save plots
+            for plot_obj in [efficiency2DPlot,Num2D,Den2D]:
+                plot_obj.Draw("COLZ TEXT45")
+                c1.Modified()
+                c1.Update()
+                c1.SaveAs("./Output/PFA_Analyzer_Output/Plot/"+timestamp+"/"+matchingVar+"/"+plot_obj.GetTitle()+".pdf")
             
-            c1.cd()
-            efficiency2DPlot.Draw("COLZ TEXT45")
+            Summary.Draw("APE")
             c1.Modified()
             c1.Update()
-            c1.SaveAs("./Plot/"+timestamp+"/"+matchingVar+"/"+efficiency2DPlot.GetTitle()+".pdf")
-            
-            c2.cd()
-            Num2D.Draw("COLZ TEXT45")
-            c2.Modified()
-            c2.Update()
-            c2.SaveAs("./Plot/"+timestamp+"/"+matchingVar+"/"+Num2D.GetTitle()+".pdf")
-            
-            c3.cd()
-            Den2D.Draw("COLZ TEXT45")
-            c3.Modified()
-            c3.Update()
-            c3.SaveAs("./Plot/"+timestamp+"/"+matchingVar+"/"+Den2D.GetTitle()+".pdf")
-            c4.cd()
-            Summary.Draw("APE")
-            c4.Modified()
-            c4.Update()
-            c4.SaveAs("./Plot/"+timestamp+"/"+matchingVar+"/"+Summary.GetTitle()+".pdf")
+            c1.SaveAs("./Output/PFA_Analyzer_Output/Plot/"+timestamp+"/"+matchingVar+"/"+Summary.GetTitle()+".pdf")
 
             writeToTFile(OutF,efficiencyByEta_Short,"Efficiency/"+matchingVar+"/ByEta/"+reg_tag_string+lay_tag_string+"/")
             writeToTFile(OutF,efficiencyByEta_Long,"Efficiency/"+matchingVar+"/ByEta/"+reg_tag_string+lay_tag_string+"/")
@@ -954,7 +931,7 @@ for matchingVar in matching_variables:
 for key in TH1MetaData.keys():
     writeToTFile(OutF,TH1MetaData[key],"Metadata/")
 
-printSummary(EfficiencyDictGlobal,matching_variables,ResidualCutOff,matching_variable_units)
+printSummary(EfficiencyDictGlobal,matching_variables,ResidualCutOff,matching_variable_units,debug=args.verbose)
 
 
 for matchingVar in ['glb_phi','glb_rdphi']:
@@ -972,4 +949,9 @@ for matchingVar in ['glb_phi','glb_rdphi']:
         tempList.append([chID,region,chamber,layer,eta,matchedRecHit,propHit])
 
     data = pd.DataFrame(tempList,columns=['chamberID',"region","chamber","layer","etaPartition","matchedRecHit","propHit"])
-    data.to_csv('./Plot/'+timestamp+'/MatchingSummary_'+matchingVar+'.csv', index=False)
+    data.to_csv('./Output/PFA_Analyzer_Output/CSV/'+timestamp+'/MatchingSummary_'+matchingVar+'.csv', index=False)
+
+print "\n#############\nOUTPUT\n#############"
+print "\tCSVs in \t"+'./Output/PFA_Analyzer_Output/CSV/'+timestamp
+print "\tROOT_File \t"+"./Output/PFA_Analyzer_Output/ROOT_File/"+timestamp+".root"
+print "\tPlots in\t"+'./Output/PFA_Analyzer_Output/Plot/'+timestamp
