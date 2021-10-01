@@ -47,6 +47,7 @@ args = parser.parse_args()
 
 
 ROOT.gROOT.SetBatch(True)
+ROOT.gStyle.SetLineScalePS(1)
 if not args.verbose: ROOT.gROOT.ProcessLine("gErrorIgnoreLevel=2001;") #suppressed everything less-than-or-equal-to kWarning
 
 
@@ -76,47 +77,8 @@ minME3Hit = args.minME3
 minME4Hit = args.minME4
 
 noisyEtaPID = []
-chamberNumberOFF = [] #if args.chamberOFF is None else importOFFChamber(args.chamberOFF)
-VFATOFFDict = {} if args.VFATOFF is None else importOFFVFAT(args.VFATOFF,chamberNumberOFF)
+VFATOFFDict = {} if args.VFATOFF is None else importOFFVFAT(args.VFATOFF)
 chamberOFFLS = {} if args.chamberOFF is None else ChamberOFF_byLS(args.chamberOFF)
-
-chamberOFFCanvas = setUpCanvas("ExcludedChambers",1200,1200)
-chamberOFFCanvas.Divide(2,2)
-VFATOFFCanvas = setUpCanvas("ExcludedVFAT",1200,1200)
-VFATOFFCanvas.Divide(2,2)
-ExclusionSummaryCanvas = setUpCanvas("GE11 Masked",1200,1200)
-ExclusionSummaryCanvas.Divide(2,2)
-
-OFFChambers_plot = ChambersOFFHisto(chamberNumberOFF)
-for counter,plot in enumerate(OFFChambers_plot):
-    chamberOFFCanvas.cd(counter+1)
-    plot.Draw()
-
-OFFVFATs_plot = VFATOFFHisto(VFATOFFDict)
-for counter,plot in enumerate(OFFVFATs_plot):
-    VFATOFFCanvas.cd(counter+1)
-    plot.Draw("COLZ")
-
-GE11Discarded_plot, NexcludedVFAT = GE11DiscardedSummary(chamberNumberOFF,VFATOFFDict)
-for counter,plot in enumerate(GE11Discarded_plot):
-    ExclusionSummaryCanvas.cd(counter+1)
-    plot.Draw("COLZ")
-ExclusionSummaryCanvas.cd()
-tempPad=ROOT.TPad("tempPad","tempPad",0,0,1,1)
-tempPad.SetFillStyle(4000)
-tempPad.Draw()
-tempPad.cd()
-s = "VFAT Masked: "+str(NexcludedVFAT)+"/"+str(144*24)+"   "+str(100-100*round(float(NexcludedVFAT)/(144*24),3))+"% GE11 Surface Analysed"
-t = ROOT.TLatex(0.15,0.5,s)
-t.SetTextSize(0.035)
-t.Draw()
-
-chamberOFFCanvas.Modified()
-chamberOFFCanvas.Update()
-VFATOFFCanvas.Modified()
-VFATOFFCanvas.Update()
-ExclusionSummaryCanvas.Modified()
-ExclusionSummaryCanvas.Update()
 
 TH1nbins = 120
 TH2nbins = 200
@@ -144,7 +106,8 @@ THSanityChecks = {'Occupancy':{},
                                             'AfterMatching':{'Long':{},'Short':{}}
                                             },
                   'RecHitperStrip':{},
-                  'NEvts':ROOT.TH1F("NumberOfAnalyzedEVTs","NumberOfAnalyzedEVTs",100,1,1)
+                  'NEvts':ROOT.TH1F("NumberOfAnalyzedEVTs","NumberOfAnalyzedEVTs",100,1,1),
+                  'CLS':{'glb_phi':{},'glb_rdphi':{}}
                 }
 
 TH1MetaData = { 'isFiducialCut':[],
@@ -179,9 +142,9 @@ TH1MetaData['minME1Hit'].Fill(minME1Hit)
 TH1MetaData['minME2Hit'].Fill(minME2Hit)
 TH1MetaData['minME3Hit'].Fill(minME3Hit)
 TH1MetaData['minME4Hit'].Fill(minME4Hit)
-TH1MetaData['chamberOFFCanvas']=chamberOFFCanvas
-TH1MetaData['VFATOFFCanvas']=VFATOFFCanvas
-TH1MetaData['ExclusionSummaryCanvas']=ExclusionSummaryCanvas
+TH1MetaData['chamberOFFCanvas']=setUpCanvas("ChamberOFF_byLS",1200,1200)
+TH1MetaData['VFATOFFCanvas']=setUpCanvas("ExcludedVFAT",1200,1200)
+TH1MetaData['ExclusionSummaryCanvas']=setUpCanvas("ChamberMask_Summary",1200,1200)
 
 
 
@@ -210,6 +173,15 @@ THSanityChecks['Occupancy'].setdefault('BeforeMatching',{'Reco':ROOT.TH2F("RecoH
                                                          'ML2':{},
                                                          'PL1':{},
                                                          'PL2':{}})
+for t_re in [-1,1]:
+    for t_la in [1,2]:
+        for t_ch in range(1,37):
+            ch_id = ReChLa2chamberName(t_re,t_ch,t_la)
+            THSanityChecks['CLS']['glb_rdphi'].setdefault(ch_id,{})
+            THSanityChecks['CLS']['glb_phi'].setdefault(ch_id,{})
+            for t_eta in range(1,9):
+                THSanityChecks['CLS']['glb_rdphi'][ch_id].setdefault(t_eta,ROOT.TH1F(ch_id+"_etaP"+str(t_eta)+" ClusterSize rdphi",ch_id+"_etaP"+str(t_eta)+" ClusterSize rdphi",20,0,20))
+                THSanityChecks['CLS']['glb_phi'][ch_id].setdefault(t_eta,ROOT.TH1F(ch_id+"_etaP"+str(t_eta)+" ClusterSize phi",ch_id+"_etaP"+str(t_eta)+" ClusterSize phi",20,0,20))
 
 for key in ['ML1','ML2','PL1','PL2']:
     THSanityChecks['Occupancy']['BeforeMatching'][key]['RecHits'] = ROOT.TH2F(key+"_RecHitsOccupancy",key+"_RecHitsOccupancy",38,-0.5,37.5,10,-0.5,9.5)
@@ -316,10 +288,11 @@ for fl in files:
     chain.Add(fl)
 
 chainEntries = chain.GetEntries()
+maxLS = 0
 print "\n#############\nStarting\n#############"
 print "Analysing run(s): \t", [int(regularExpression.sub("[^0-9]", "", i)) for i in args.dataset]
-
 print "Number of evts \t\t%.2fM\n" %(round(float(chainEntries)/10**6,2))
+
 THSanityChecks['NEvts'].Fill(chainEntries)
 for chain_index,evt in enumerate(chain):
     
@@ -331,6 +304,7 @@ for chain_index,evt in enumerate(chain):
     
     EventNumber = evt.event_eventNumber
     LumiSection = evt.event_lumiBlock
+    maxLS = max(maxLS,LumiSection)
     RunNumber = evt.event_runNumber
     
     THSanityChecks['NHits']['BeforeMatching']['PerEVT']['Prop'].Fill(n_gemprop)
@@ -356,7 +330,7 @@ for chain_index,evt in enumerate(chain):
         chamber = evt.gemRecHit_chamber[RecHit_index]
         layer = evt.gemRecHit_layer[RecHit_index]
         etaP = evt.gemRecHit_etaPartition[RecHit_index]
-        RecHitEtaPartitionID = region*(100*chamber+10*layer+etaP)
+        RecHitEtaPartitionID =  region*(100*chamber+10*layer+etaP)
         endcapKey = "PL"+str(layer) if region > 0 else "ML"+str(layer)
 
 
@@ -504,6 +478,7 @@ for chain_index,evt in enumerate(chain):
         
         region,chamber,layer,eta = getInfoFromEtaID(etaPartitionID)
         PropHitonEta = PropHit_Dict[etaPartitionID]
+        current_chamber_ID = ReChLa2chamberName(region,chamber,layer)
 
 
         nPropHitsOnEtaID = len(PropHitonEta['glb_phi'])
@@ -665,6 +640,8 @@ for chain_index,evt in enumerate(chain):
                 THSanityChecks['Occupancy'][matchingVar]['AfterMatching']['Reco'].Fill(RecHitonEta['glb_x'][reco_hit_index],RecHitonEta['glb_y'][reco_hit_index])
                 THSanityChecks['Occupancy'][matchingVar]['AfterMatching']['Prop'].Fill(PropHitonEta['glb_x'][prop_hit_index],PropHitonEta['glb_y'][prop_hit_index])
 
+                THSanityChecks['CLS'][matchingVar][current_chamber_ID][eta].Fill(RecHitonEta['cluster_size'][reco_hit_index])
+
                 if chamber%2 == 0:
                     if matchingVar == 'glb_phi': THSanityChecks['PropHit_DirLoc_xOnGE11']['AfterMatching']['Long']['eta'+str(eta)].Fill(PropHitonEta['Loc_dirX'][prop_hit_index])
                     TH1Fresidual_collector[matchingVar]['long']['glb_phi'].Fill(glb_phi_residual)
@@ -748,18 +725,48 @@ TH2Fresidual_collector = fillPlot2DResidualContainer(TH2Fresidual_collector,matc
 print("--- %s seconds ---" % (time.time() - start_time))
 
 
-
 ## Storing the results
-
 timestamp =  time.strftime("%-y%m%d_%H%M") if args.outputname is None else args.outputname
+OutF = ROOT.TFile("./Output/PFA_Analyzer_Output/ROOT_File/"+timestamp+".root","RECREATE")
+
 subprocess.call(["mkdir", "-p", "./Output/PFA_Analyzer_Output/CSV/"+timestamp])
 subprocess.call(["mkdir", "-p", "./Output/PFA_Analyzer_Output/CSV/"+timestamp])
 subprocess.call(["mkdir", "-p", "./Output/PFA_Analyzer_Output/Plot/"+timestamp+"/"+"glb_phi/"])
 subprocess.call(["mkdir", "-p", "./Output/PFA_Analyzer_Output/Plot/"+timestamp+"/"+"glb_rdphi/"])
 
 
+### Masking
+TH1MetaData['chamberOFFCanvas'].Divide(2,2)
+TH1MetaData['VFATOFFCanvas'].Divide(2,2)
+TH1MetaData['ExclusionSummaryCanvas'].Divide(2,2)
 
-OutF = ROOT.TFile("./Output/PFA_Analyzer_Output/ROOT_File/"+timestamp+".root","RECREATE")
+OFFChambers_plots = ChambersOFFHisto(chamberOFFLS,maxLS)
+for counter,plot in enumerate(OFFChambers_plots):
+    TH1MetaData['chamberOFFCanvas'].cd(counter+1)
+    plot.Draw()
+
+OFFVFATs_plots = VFATOFFHisto(VFATOFFDict)
+for counter,plot in enumerate(OFFVFATs_plots):
+    TH1MetaData['VFATOFFCanvas'].cd(counter+1)
+    plot.Draw("COLZ")
+
+GE11Discarded_plots = GE11DiscardedSummary(chamberOFFLS,maxLS,VFATOFFDict)
+for counter,plot in enumerate(GE11Discarded_plots):
+    TH1MetaData['ExclusionSummaryCanvas'].cd(counter+1)
+    plot.Draw("COLZ")
+    TH1MetaData['ExclusionSummaryCanvas'].cd(counter+1).Update()
+    palette = plot.GetListOfFunctions().FindObject("palette")
+    palette.SetX2NDC(0.93)
+    palette.Draw()
+setUpCanvas("GE11 Masked",1200,1200).cd()
+
+TH1MetaData['chamberOFFCanvas'].Modified()
+TH1MetaData['chamberOFFCanvas'].Update()
+TH1MetaData['VFATOFFCanvas'].Modified()
+TH1MetaData['VFATOFFCanvas'].Update()
+TH1MetaData['ExclusionSummaryCanvas'].Modified()
+TH1MetaData['ExclusionSummaryCanvas'].Update()
+TH1MetaData['ExclusionSummaryCanvas'].SaveAs("./Output/PFA_Analyzer_Output/Plot/"+timestamp+"/ExclusionCanvas.pdf")
 
 writeToTFile(OutF,THSanityChecks['NEvts'],"SanityChecks/NumberOfEVTs/")
 
@@ -785,7 +792,7 @@ writeToTFile(OutF,THSanityChecks['Occupancy']['BeforeMatching']['PropLocalLong']
 writeToTFile(OutF,THSanityChecks['Occupancy']['BeforeMatching']['PropLocalShort'],"SanityChecks/Occupancy/BeforeMatching")
 writeToTFile(OutF,THSanityChecks['Occupancy']['BeforeMatching']['Reco'],"SanityChecks/Occupancy/BeforeMatching")
 
-writeToTFile(OutF,test,"SanityChecks/AngleDirCorrelation/")
+writeToTFile(OutF,test,"SanityChecks/CLS_vs_Direction/")
 
 for key in ['ML1','ML2','PL1','PL2']:
     writeToTFile(OutF,THSanityChecks['Occupancy']['BeforeMatching'][key]['PropHits'],"SanityChecks/Occupancy/BeforeMatching/"+key)
@@ -926,6 +933,11 @@ for matchingVar in matching_variables:
             writeToTFile(OutF,efficiencyByEta_Long,"Efficiency/"+matchingVar+"/ByEta/"+reg_tag_string+lay_tag_string+"/")
             writeToTFile(OutF,efficiencyByEta_All,"Efficiency/"+matchingVar+"/ByEta/"+reg_tag_string+lay_tag_string+"/")
 
+            for t_ch in range(1,37):
+                current_chamber_ID = ReChLa2chamberName(r,t_ch,l)
+                for t_eta in range(1,9):
+                    writeToTFile(OutF,THSanityChecks['CLS'][matchingVar][current_chamber_ID][t_eta],"SanityChecks/CLS/"+matchingVar+"/"+reg_tag_string+lay_tag_string+"/"+current_chamber_ID)
+
 
 
 for key in TH1MetaData.keys():
@@ -944,11 +956,16 @@ for matchingVar in ['glb_phi','glb_rdphi']:
     
         size = "S" if chamber%2 == 1 else "L"
         miplus = "M" if region == -1 else "P"
-        chID = 'GE11-'+miplus+'-%02d' % chamber +"L"+str(layer)+"-"+size 
-    
-        tempList.append([chID,region,chamber,layer,eta,matchedRecHit,propHit])
+        chID = ReChLa2chamberName(region,chamber,layer)
 
-    data = pd.DataFrame(tempList,columns=['chamberID',"region","chamber","layer","etaPartition","matchedRecHit","propHit"])
+        AVG_CLS = THSanityChecks['CLS'][matchingVar][chID][eta].GetMean()
+
+
+
+    
+        tempList.append([chID,region,chamber,layer,eta,matchedRecHit,propHit,AVG_CLS])
+
+    data = pd.DataFrame(tempList,columns=['chamberID',"region","chamber","layer","etaPartition","matchedRecHit","propHit","AVG_CLS"])
     data.to_csv('./Output/PFA_Analyzer_Output/CSV/'+timestamp+'/MatchingSummary_'+matchingVar+'.csv', index=False)
 
 print "\n#############\nOUTPUT\n#############"

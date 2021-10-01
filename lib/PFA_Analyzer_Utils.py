@@ -104,7 +104,7 @@ def propHit2VFAT(glb_r,loc_x,etaP):
     return VFAT
 
 ## returns a dict with a list of OFF VFAT for each  etapartitionID (key of the dict)
-def importOFFVFAT(list_of_file_path,chamberNumberOFF):
+def importOFFVFAT(list_of_file_path):
     off_VFAT = {}
     for file_path in list_of_file_path:
         try:
@@ -123,17 +123,12 @@ def importOFFVFAT(list_of_file_path,chamberNumberOFF):
 
             iEta , iPhi = VFAT2iEta_iPhi(VFAT)
             etaPartitionID = region*(100*chamber+10*layer+iEta)
-            ## Avoid to fill VFAT for which the entire chamber is OFF
-            if [region,chamber,layer] in chamberNumberOFF:
-                continue
+
             ## If the key doesn't exsist create it, then fill the list
+            off_VFAT.setdefault(etaPartitionID,[])
             if maskReason == 1:
-                off_VFAT.setdefault(etaPartitionID,[])
                 off_VFAT[etaPartitionID].append(VFAT)
-    
-    ## Removing duplicates
-    for key, value in off_VFAT.items():
-        off_VFAT[key] = list(set(off_VFAT[key]))
+
     return off_VFAT
 
 def chamberName2ReChLa(chamberName):
@@ -158,7 +153,7 @@ def EndcapLayer2label(re,layer):
     return label+str(layer)
     
 
-def ChambersOFFHisto(chamberNumberOFF):
+def ChambersOFFHisto(chamberNumberOFF_byLS,maxLS):
     GE11_OFF = {-1:{},1:{}}
     GE11_OFF[-1][1] = ROOT.TH1F("GE11-M-L1  Masked Chambers","GE11-M-L1  Masked Chambers",36,0.5,36.5)
     GE11_OFF[-1][2] = ROOT.TH1F("GE11-M-L2  Masked Chambers","GE11-M-L2  Masked Chambers",36,0.5,36.5)
@@ -168,16 +163,17 @@ def ChambersOFFHisto(chamberNumberOFF):
     for region in [-1,1]:
         for layer in [1,2]:
             for chamber in range(1,37):
-                if [region,chamber,layer] in chamberNumberOFF:
-                    GE11_OFF[region][layer].SetBinContent(chamber,1)
-                else:
-                    GE11_OFF[region][layer].SetBinContent(chamber,0)
+                ch_ID = ReChLa2chamberName(region,chamber,layer) 
+                n_OFF = 0 if ch_ID not in chamberNumberOFF_byLS else (len(chamberNumberOFF_byLS[ch_ID]) if -1 not in chamberNumberOFF_byLS[ch_ID] else maxLS)
+                percentageOFF = 100*float(n_OFF)/maxLS
+                GE11_OFF[region][layer].SetBinContent(chamber,percentageOFF)
     for key_1 in GE11_OFF.keys():
         for key_2 in GE11_OFF[key_1].keys():
             GE11_OFF[key_1][key_2].GetYaxis().SetTickLength(0.005)
+            GE11_OFF[key_1][key_2].GetYaxis().SetTitle("Masked Lumisection (%)")
             GE11_OFF[key_1][key_2].SetStats(False)
             GE11_OFF[key_1][key_2].SetMinimum(0)
-            GE11_OFF[key_1][key_2].SetMaximum(2)
+            GE11_OFF[key_1][key_2].SetMaximum(110)
     return GE11_OFF[-1][1],GE11_OFF[1][1],GE11_OFF[-1][2],GE11_OFF[1][2]
 
 
@@ -204,37 +200,44 @@ def VFATOFFHisto(VFATOFF_dictionary):
     return VFAT_OFFTH2D[-1][1],VFAT_OFFTH2D[1][1],VFAT_OFFTH2D[-1][2],VFAT_OFFTH2D[1][2]
 
 
-def GE11DiscardedSummary(chamberNumberOFF,VFATOFF_dictionary):
+def GE11DiscardedSummary(chamberNumberOFF_byLS,maxLS,VFATOFF_dictionary):
     VFAT_OFFTH2D = {-1:{},1:{}}
-    VFAT_OFFTH2D[-1][1] = ROOT.TH2F("GE11-M-L1  Masked Surface","GE11-M-L1  Masked Surface",36,0.5,36.5,24,-0.5,23.5)
-    VFAT_OFFTH2D[-1][2] = ROOT.TH2F("GE11-M-L2  Masked Surface","GE11-M-L2  Masked Surface",36,0.5,36.5,24,-0.5,23.5)
-    VFAT_OFFTH2D[1][1] = ROOT.TH2F("GE11-P-L1  Masked Surface","GE11-P-L1  Masked Surface",36,0.5,36.5,24,-0.5,23.5)
-    VFAT_OFFTH2D[1][2] = ROOT.TH2F("GE11-P-L2  Masked Surface","GE11-P-L2  Masked Surface",36,0.5,36.5,24,-0.5,23.5)
+    VFAT_OFFTH2D[-1][1] = ROOT.TH2F("GE11-M-L1  Masked","GE11-M-L1  Masked",36,0.5,36.5,24,-0.5,23.5)
+    VFAT_OFFTH2D[-1][2] = ROOT.TH2F("GE11-M-L2  Masked","GE11-M-L2  Masked",36,0.5,36.5,24,-0.5,23.5)
+    VFAT_OFFTH2D[1][1] = ROOT.TH2F("GE11-P-L1  Masked","GE11-P-L1  Masked",36,0.5,36.5,24,-0.5,23.5)
+    VFAT_OFFTH2D[1][2] = ROOT.TH2F("GE11-P-L2  Masked","GE11-P-L2  Masked",36,0.5,36.5,24,-0.5,23.5)
 
-    OFFVFAT_Counter = 0
 
     for key_1 in VFAT_OFFTH2D.keys():
         for key_2 in VFAT_OFFTH2D[key_1].keys():
             VFAT_OFFTH2D[key_1][key_2].GetYaxis().SetTitle("VFAT Number")
+            VFAT_OFFTH2D[key_1][key_2].GetYaxis().SetTickLength(0.005)
+            VFAT_OFFTH2D[key_1][key_2].GetXaxis().SetTickLength(0.005)
             VFAT_OFFTH2D[key_1][key_2].GetXaxis().SetTitle("Chamber")
+            VFAT_OFFTH2D[key_1][key_2].GetZaxis().SetTitle("Masked Lumisection (%)")
+            VFAT_OFFTH2D[key_1][key_2].GetZaxis().SetTitleSize(0.03)
+            VFAT_OFFTH2D[key_1][key_2].GetZaxis().SetTitleOffset(1.1)
+            VFAT_OFFTH2D[key_1][key_2].GetZaxis().SetLabelSize(0.025)
             VFAT_OFFTH2D[key_1][key_2].SetStats(False)
             VFAT_OFFTH2D[key_1][key_2].SetMinimum(0)
-
-    for key, value in VFATOFF_dictionary.items():
-        region,chamber,layer,etaPartition = getInfoFromEtaID(key)
-        for VFATN in value:
-            VFAT_OFFTH2D[region][layer].Fill(chamber,VFATN)
-            OFFVFAT_Counter += 1
+            VFAT_OFFTH2D[key_1][key_2].SetMaximum(100)
     
     for region in [-1,1]:
         for layer in [1,2]:
             for chamber in range(1,37):
-                if [region,chamber,layer] in chamberNumberOFF:
-                    for VFATN in range(0,24):
-                        VFAT_OFFTH2D[region][layer].Fill(chamber,VFATN)
-                        OFFVFAT_Counter += 1
+                current_chamber_ID = ReChLa2chamberName(region,chamber,layer)
+                n_OFF = 0 if current_chamber_ID not in chamberNumberOFF_byLS else (len(chamberNumberOFF_byLS[current_chamber_ID]) if -1 not in chamberNumberOFF_byLS[current_chamber_ID] else maxLS)
+                percentageOFF = 100*float(n_OFF)/maxLS
+                for VFATN in range(0,24):
+                    eta,phi = VFAT2iEta_iPhi(VFATN)
+                    etaPartitionID = region*(100*chamber+10*layer+eta)
 
-    return [VFAT_OFFTH2D[-1][1],VFAT_OFFTH2D[1][1],VFAT_OFFTH2D[-1][2],VFAT_OFFTH2D[1][2]],OFFVFAT_Counter
+                    if etaPartitionID in VFATOFF_dictionary.keys() and VFATN in VFATOFF_dictionary[etaPartitionID]:
+                        VFAT_OFFTH2D[region][layer].SetBinContent(chamber,VFATN+1,100.)
+                    else:
+                        VFAT_OFFTH2D[region][layer].SetBinContent(chamber,VFATN+1,percentageOFF)
+
+    return [VFAT_OFFTH2D[-1][1],VFAT_OFFTH2D[1][1],VFAT_OFFTH2D[-1][2],VFAT_OFFTH2D[1][2]]
 
 def incidenceAngle_vs_Eff(sourceDict,input_region=1,input_layer=1):
     ## Transforming in list
@@ -679,3 +682,7 @@ def printSummary(sourceDict,matching_variables,ResidualCutOff,matching_variable_
         except:
             if debug: print "WARNING"
         print "#############"
+
+
+if __name__ == '__main__':
+    pass
