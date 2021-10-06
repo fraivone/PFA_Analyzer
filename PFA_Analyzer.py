@@ -287,13 +287,14 @@ chain = ROOT.TChain("muNtupleProducer/MuDPGTree")
 for fl in files:
     chain.Add(fl)
 
-# ## Enabling only the branches which are actually in use
-# # 1. Disabling them all
-# chain.SetBranchStatus("*",0);     
+## Enabling only the branches which are actually in use
+# 1. Disabling them all
+chain.SetBranchStatus("*",0);     
 
-# branchList=["event_eventNumber","event_lumiBlock","event_runNumber","gemRecHit_region", "gemRecHit_chamber", "gemRecHit_layer", "gemRecHit_etaPartition", "gemRecHit_g_r", "gemRecHit_loc_x", "gemRecHit_g_x", "gemRecHit_g_y", "gemRecHit_g_z", "gemRecHit_g_phi", "gemRecHit_firstClusterStrip", "gemRecHit_cluster_size", "mu_propagated_region", "mu_propagated_chamber", "mu_propagated_layer", "mu_propagated_etaP", "mu_propagated_Outermost_z", "mu_isincoming", "mu_propagated_isME11", "mu_propagatedGlb_r", "mu_propagatedLoc_x", "mu_propagatedLoc_y", "mu_propagatedGlb_x", "mu_propagatedGlb_y", "mu_propagatedGlb_z", "mu_propagatedGlb_phi", "mu_propagatedGlb_errR", "mu_propagatedGlb_errPhi", "mu_propagatedLoc_dirX", "mu_propagatedLoc_dirY", "mu_propagatedLoc_dirZ", "mu_propagated_pt", "mu_propagated_isGEM", "mu_propagated_EtaPartition_rMax", "mu_propagated_EtaPartition_rMin", "mu_propagated_EtaPartition_phiMax", "mu_propagated_EtaPartition_phiMin", "mu_propagated_TrackNormChi2", "mu_propagated_nME1hits", "mu_propagated_nME2hits", "mu_propagated_nME3hits", "mu_propagated_nME4hits"]# 2. Enabling the useful ones
-# for b in branchList:
-#     chain.SetBranchStatus(b,1)
+branchList=["event_eventNumber","event_lumiBlock","event_runNumber","gemRecHit_region", "gemRecHit_chamber", "gemRecHit_layer", "gemRecHit_etaPartition", "gemRecHit_g_r", "gemRecHit_loc_x", "gemRecHit_g_x", "gemRecHit_g_y", "gemRecHit_g_z", "gemRecHit_g_phi", "gemRecHit_firstClusterStrip", "gemRecHit_cluster_size", "mu_propagated_region", "mu_propagated_chamber", "mu_propagated_layer", "mu_propagated_etaP", "mu_propagated_Outermost_z", "mu_isincoming", "mu_propagated_isME11", "mu_propagatedGlb_r", "mu_propagatedLoc_x", "mu_propagatedLoc_y", "mu_propagatedGlb_x", "mu_propagatedGlb_y", "mu_propagatedGlb_z", "mu_propagatedGlb_phi", "mu_propagatedGlb_errR", "mu_propagatedGlb_errPhi", "mu_propagatedLoc_dirX", "mu_propagatedLoc_dirY", "mu_propagatedLoc_dirZ", "mu_propagated_pt", "mu_propagated_isGEM", "mu_propagated_EtaPartition_rMax", "mu_propagated_EtaPartition_rMin", "mu_propagated_EtaPartition_phiMax", "mu_propagated_EtaPartition_phiMin", "mu_propagated_TrackNormChi2", "mu_propagated_nME1hits", "mu_propagated_nME2hits", "mu_propagated_nME3hits", "mu_propagated_nME4hits"]
+# 2. Enabling the useful ones
+for b in branchList:
+    chain.SetBranchStatus(b,1)
 
 
 chainEntries = chain.GetEntries()
