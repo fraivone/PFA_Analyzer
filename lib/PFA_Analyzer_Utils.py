@@ -304,6 +304,49 @@ def generate2DResidualContainer(matching_variables,nbins,minB):
 
     return TH2Fresidual_collector
 
+
+def generate1DResidualContainer(matching_variables,nbins,ResidualCutOff):
+    output_dict = {}
+    for mv in matching_variables:
+        output_dict[mv] = {}
+        minB = -ResidualCutOff[mv]*2
+
+        for (re,la) in [(1,1),(1,2),(-1,1),(-1,2)]:
+            endcap_key = EndcapLayer2label(re,la)
+            output_dict[mv][endcap_key] = {}
+
+            for chamber in range(1,37):
+                chID = ReChLa2chamberName(re,chamber,la)
+                output_dict[mv][endcap_key][chID] = {}
+                for eta in range(1,9)+["All"]:
+                    titleTH1 = chID+"_eta"+str(eta)+"_"
+                    output_dict[mv][endcap_key][chID][eta]={"Residual":ROOT.TH1F(titleTH1+"Residual",titleTH1+"Residual",nbins,minB,-minB)}
+                    output_dict[mv][endcap_key][chID][eta]["Residual"].GetXaxis().SetTitle("ErrR (cm)")
+    return output_dict
+
+
+def generatePropagationErrorContainer(maxErrOnPropR, maxErrOnPropPhi):
+    output_dict = {}
+
+    for which_hit in ["MatchedHits","AllHits"]:
+        output_dict[which_hit] = {}
+        for (re,la) in [(1,1),(1,2),(-1,1),(-1,2)]:
+            endcap_key = EndcapLayer2label(re,la)
+            output_dict[which_hit][endcap_key] = {}
+
+            for chamber in range(1,37):
+                chID = ReChLa2chamberName(re,chamber,la)
+                output_dict[which_hit][endcap_key][chID] = {}
+                for eta in range(1,9)+["All"]:
+                    titleTH1 = chID+"_eta"+str(eta)+"_"
+                    output_dict[which_hit][endcap_key][chID][eta] = {"ErrPhi":ROOT.TH1F(titleTH1+"PropagationError on Phi",titleTH1+"PropagationError on Phi",200,0,2*maxErrOnPropPhi),
+                                                          "ErrR":ROOT.TH1F(titleTH1+"PropagationError on R",titleTH1+"PropagationError on R",100,0,2*maxErrOnPropR)}
+                    output_dict[which_hit][endcap_key][chID][eta]["ErrPhi"].GetXaxis().SetTitle("ErrPhi (rad)")
+                    output_dict[which_hit][endcap_key][chID][eta]["ErrR"].GetXaxis().SetTitle("ErrR (cm)")
+
+    return output_dict
+        
+
 def fillPlot2DResidualContainer(TH2Fresidual_collector,matching_variables,nbins):
     
     for key_1 in matching_variables:

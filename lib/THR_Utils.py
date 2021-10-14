@@ -212,7 +212,7 @@ def GetOverallChamberThreshold(source_folder,chamberID,verbose=False):
     
     for VFAT_N in range(24):
         # THR data
-        overall_vfat_trheshold = GetOverallVFATThreshold(source_folder,chamberID,VFAT_N,verbose=False)
+        overall_vfat_trheshold = GetOverallVFATThreshold(source_folder,chamberID,VFAT_N,verbose=verbose)
         if overall_vfat_trheshold == 10**6:
                 continue
         elif abs(overall_vfat_trheshold) > 255:
@@ -228,4 +228,5 @@ def GetOverallChamberThreshold(source_folder,chamberID,verbose=False):
         
 
 if __name__ == "__main__":
+    print GetOverallVFATThreshold("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/THR_Data/THR_ARM_DAC/SBit100","GE11-M-17L1-S",23,verbose=True)
     pass

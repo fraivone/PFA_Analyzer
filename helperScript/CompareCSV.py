@@ -21,8 +21,7 @@ parser.add_argument('--verbose', default=False, action='store_true',help="Verbos
 parser.add_argument('--batch', default=False, action='store_true',help="ROOT in batch mode",required=False)
 
 
-thr_folder_old = "/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/THR_Data/THR_ARM_DAC/SBit100/"
-thr_folder_new = "/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/THR_Data/THR_ARM_DAC/SBit100/"
+thr_folder_old = "/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/THR_Data/THR_ARM_DAC/SBit100_Trimming/"
 
 args = parser.parse_args()
 enable_THR = args.THR
@@ -108,12 +107,11 @@ for index,file_path in enumerate(inputs):
 if enable_THR:
     print "Adding a secondary y-axis for THR comparison... using data from"
     print "\t"+thr_folder_old
-    print "\t"+thr_folder_new
 
-    secondary_axis = ROOT.TGaxis(36.5,0,36.5, 1.1,-50,50,505,"+LS")
+    secondary_axis = ROOT.TGaxis(36.5,0,36.5, 1.1,0,255,505,"+LS")
     secondary_axis.SetLineColor(ROOT.kRed)
     secondary_axis.SetLabelColor(ROOT.kRed)
-    secondary_axis.SetTitle("#Delta Overall THR (%)")
+    secondary_axis.SetTitle("Chamber Overall THR")
     secondary_axis.SetTickLength(0.015)
     for region,layer in [(-1,1),(1,1),(-1,2),(1,2)]:
         label = EndcapLayer2label(region,layer)
@@ -122,16 +120,15 @@ if enable_THR:
             
             chamberID = ReChLa2chamberName(region,chamber,layer)
             old_thr = GetOverallChamberThreshold(thr_folder_old,chamberID,verbose=args.verbose)
-            new_thr = GetOverallChamberThreshold(thr_folder_new,chamberID,verbose=args.verbose)
-            if old_thr == None or new_thr==None: delta_TRH = -50
-            else: delta_THR = (new_thr - old_thr)/(old_thr)*100
+            if old_thr == None : graph_point = 0
+            else: graph_point = old_thr
             
-            TGraph_THR_Dict[label].SetPoint(chamber-1,chamber,1.1*float(delta_THR+50)/100)
-            print delta_THR
+            TGraph_THR_Dict[label].SetPoint(chamber-1,chamber,1.1*float(graph_point)/255)
+            print graph_point
         
-        TGraph_THR_Dict[label].SetTitle("Delta THR (Trimm - NoTrimm) DAC units")
-        TGraph_THR_Dict[label].SetName("Delta THR (Trimm - NoTrimm) DAC units")
-        TGraph_THR_Dict[label].SetMarkerStyle(20)
+        TGraph_THR_Dict[label].SetTitle("Chamber Overall THR")
+        TGraph_THR_Dict[label].SetName("Chamber Overall THR")
+        TGraph_THR_Dict[label].SetMarkerStyle(45)
         TGraph_THR_Dict[label].SetMarkerColor(ROOT.kRed)
         Multigraph_Dict[label].Add(TGraph_THR_Dict[label])
 
@@ -140,11 +137,11 @@ for index,key in enumerate(Multigraph_Dict.keys()):
     c2.cd(index+1).SetGrid()
     Multigraph_Dict[key].Draw("0APE")
     
-    leg = c2.cd(index+1).BuildLegend()
+    leg = c2.cd(index+1).BuildLegend(.1,.8,.4,1.)
     leg.SetBorderSize(2)
     if enable_THR: 
         secondary_axis.Draw()
-        leg.GetListOfPrimitives()[2].SetOption("P")
+        leg.GetListOfPrimitives()[-1].SetOption("P")
 
     Text_Dict[key].Draw()
 
@@ -152,4 +149,4 @@ for index,key in enumerate(Multigraph_Dict.keys()):
 c2.Modified()
 c2.Update()
 c2.SaveAs("./Output/CompareCSV/"+output+".pdf")
-raw_input()
+print "Your ouput \t","./Output/CompareCSV/"+output+".pdf"
