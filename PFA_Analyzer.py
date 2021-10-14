@@ -55,7 +55,7 @@ start_time = time.time()
 
 files = []
 for folder in args.dataset:
-    temp_files = files_in_folder("/eos/user/f/fivone/GEMNTuples/MC/Output/MC_Cosmics2021/"+folder)
+    temp_files = files_in_folder("/eos/cms/store/group/dpg_gem/comm_gem/P5_Commissioning/2021/GEMCommonNtuples/CRUZET/"+folder)
     files += [f for f in temp_files if ".root" in f]
 
 matching_variables = ['glb_phi','glb_rdphi']
