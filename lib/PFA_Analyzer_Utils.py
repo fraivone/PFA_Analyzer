@@ -1,10 +1,11 @@
+from numpy.core.numeric import NaN
 import ROOT
 import numpy
 import pandas as pd
 from ROOT_Utils import *
 import sys
 import json
-
+from array import array
 
 
 def getInfoFromEtaID(id):
@@ -90,7 +91,7 @@ def iEta_iPhi2VFAT(iEta,iPhi):
 ## Associates a propagated hit to a VFAT
 ## It is based on default GE11 geometry
 ## Might need refinements after alignment 
-def propHit2VFAT(glb_r,loc_x,etaP):
+def propHit2VFAT(glb_r,loc_x,etaP,region,chamber_number):
     ## Magic numbers taken from strip geometry
     #  They are loc_x/glb_r (basically cos phi) for strip 127 and 255 respectively
     LeftMost_iPhi_boundary = -0.029824804
@@ -98,7 +99,7 @@ def propHit2VFAT(glb_r,loc_x,etaP):
 
     prophit_cosine = loc_x/glb_r
     iPhi =  0 if  prophit_cosine<=LeftMost_iPhi_boundary else (2 if prophit_cosine>RightMost_iPhi_boundary else 1)
-
+        
     VFAT = iEta_iPhi2VFAT(etaP,iPhi)
 
     return VFAT
@@ -269,7 +270,7 @@ def incidenceAngle_vs_Eff(sourceDict,input_region=1,input_layer=1):
         NumTH1F.SetBinContent((j+1),etaPartitionRecHits)
         DenTH1F.SetBinContent((j+1),etaPartitionPropHits)
     
-    Eff_Plot.Divide(NumTH1F,DenTH1F)
+    Eff_Plot.Divide(NumTH1F,DenTH1F,"B")
     Eff_Plot.SetTitle(title+"_incidenceAngle_Eff")
     Eff_Plot.SetName(title+"_incidenceAngle_Eff")
     Eff_Plot.GetXaxis().SetTitle("Cos(#alpha)")
@@ -323,6 +324,23 @@ def generate1DResidualContainer(matching_variables,nbins,ResidualCutOff):
                     output_dict[mv][endcap_key][chID][eta]={"Residual":ROOT.TH1F(titleTH1+"Residual",titleTH1+"Residual",nbins,minB,-minB)}
                     output_dict[mv][endcap_key][chID][eta]["Residual"].GetXaxis().SetTitle("ErrR (cm)")
     return output_dict
+
+# dict[matchingVar][endcaptag][chamberID][VFAT]
+def generateVFATDict(matching_variables):
+    output_dict = {}
+    for mv in matching_variables:
+        output_dict[mv] = {}
+
+        for (re,la) in [(1,1),(1,2),(-1,1),(-1,2)]:
+            endcap_key = EndcapLayer2label(re,la)
+            output_dict[mv][endcap_key] = {}
+            for chamber in range(1,37):
+                chID = ReChLa2chamberName(re,chamber,la)
+                output_dict[mv][endcap_key][chID] = {}
+                for VFAT in range(24):
+                    output_dict[mv][endcap_key][chID][VFAT]={"num":0,"den":0}
+    return output_dict
+
 
 
 def generatePropagationErrorContainer(maxErrOnPropR, maxErrOnPropPhi):
@@ -412,7 +430,7 @@ def passCut(PropHitonEta,prop_hit_index,maxPropR_Err=0.7,maxPropPhi_Err=0.001,fi
 ## Knowing that MUST BE Num < Den
 ## Not needed...ROOT can do it automagically with TGraphAsymmErrors::DIVIDE
 def generateClopperPeasrsonInterval(num,den):
-    confidenceLevel = 0.68
+    confidenceLevel = 0.95
     alpha = 1 - confidenceLevel
     
     lowerLimit = ROOT.Math.beta_quantile(alpha/2,num,den-num + 1)
@@ -467,9 +485,229 @@ def generateEfficiencyPlotbyEta(sourceDict,input_region=1,input_layer=1):
     
     
     for chambers in ['All','Long','Short']: 
-        Plot_Container[chambers].Divide(TH1F_TempContainer[chambers]['num'],TH1F_TempContainer[chambers]['den'])
+        Plot_Container[chambers].Divide(TH1F_TempContainer[chambers]['num'],TH1F_TempContainer[chambers]['den'],"B")
 
     return Plot_Container['Short'],Plot_Container['Long'],Plot_Container['All']
+
+def generate1DEfficiencyPlotbyVFAT(EfficiencyDictVFAT,chamber_ID):
+    
+    re_ch_la_list = chamberName2ReChLa(chamber_ID)
+    re = re_ch_la_list[0]
+    ch = re_ch_la_list[1]
+    la = re_ch_la_list[2]
+    endcapTag = EndcapLayer2label(re,la)
+
+    title = chamber_ID+"_1DEffVFAT"
+    Summary = ROOT.TGraphAsymmErrors()
+    Summary.GetXaxis().SetTitle("VFAT Number")
+    Summary.GetYaxis().SetTitle("Efficiency")
+    Summary.SetMaximum(1.1)
+    Summary.SetMinimum(0)
+    Summary.SetTitle(title)
+    Summary.SetName(title)
+    Summary.SetMarkerStyle(20)
+    Summary.SetMarkerSize(.8)
+
+    TH1Num = ROOT.TH1F(title, title,24,-0.5,23.5)
+    TH1Den = ROOT.TH1F(title, title,24,-0.5,23.5)
+
+    for VFATN in range(24):
+        TH1Num.SetBinContent(VFATN,EfficiencyDictVFAT[endcapTag][chamber_ID][VFATN]['num'])
+        TH1Den.SetBinContent(VFATN,EfficiencyDictVFAT[endcapTag][chamber_ID][VFATN]['den'])
+    
+    Summary.Divide(TH1Num,TH1Den,"B")
+    Summary.GetXaxis().SetLimits(-0.5,23.5)
+
+    return Summary
+
+
+def generate2DEfficiencyPlotbyVFAT(EfficiencyDictVFAT,efficiency_target):
+    ## GEOMETRY DEFINITION
+    VFATGeometryDict = {"Long":dict((VFATN,{}) for VFATN in range(0,24)),"Short":dict((VFATN,{}) for VFATN in range(0,24))}
+
+    VFATGeometryDict['Short'][0]['x'] = np.asarray([-3.83938562003834,-4.14080692494689,-12.4513908518566,-11.5450181214881],dtype=float)
+    VFATGeometryDict['Short'][0]['y'] = np.asarray([0,10.206,10.206,0],dtype=float)
+    VFATGeometryDict['Short'][1]['x'] = np.asarray([-4.14080692494689,-4.44222822985544,-13.3577635822252,-12.4513908518566],dtype=float)
+    VFATGeometryDict['Short'][1]['y'] = np.asarray([10.206,20.412,20.412,10.206],dtype=float)
+    VFATGeometryDict['Short'][2]['x'] = np.asarray([-4.44222822985544,-4.79536310569235,-14.4196388259069,-13.3577635822252],dtype=float)
+    VFATGeometryDict['Short'][2]['y'] = np.asarray([20.412,32.369,32.369,20.412],dtype=float)
+    VFATGeometryDict['Short'][3]['x'] = np.asarray([-4.79536310569235,-5.14849798152926,-15.4815140695887,-14.4196388259069],dtype=float)
+    VFATGeometryDict['Short'][3]['y'] = np.asarray([32.369,44.326,44.326,32.369],dtype=float)
+    VFATGeometryDict['Short'][4]['x'] = np.asarray([-5.14849798152926,-5.56365370199756,-16.7298857598484,-15.4815140695887],dtype=float)
+    VFATGeometryDict['Short'][4]['y'] = np.asarray([44.326,58.383,58.383,44.326],dtype=float)
+    VFATGeometryDict['Short'][5]['x'] = np.asarray([-5.56365370199756,-5.97880942246586,-17.9782574501081,-16.7298857598484],dtype=float)
+    VFATGeometryDict['Short'][5]['y'] = np.asarray([58.383,72.44,72.44,58.383],dtype=float)
+    VFATGeometryDict['Short'][6]['x'] = np.asarray([-5.97880942246586,-6.47069378786385,-19.4573518871341,-17.9782574501081],dtype=float)
+    VFATGeometryDict['Short'][6]['y'] = np.asarray([72.4399999999999,89.0949999999999,89.0949999999999,72.4399999999999],dtype=float)
+    VFATGeometryDict['Short'][7]['x'] = np.asarray([-6.47069378786385,-6.96257815326184,-20.9364463241602,-19.4573518871341],dtype=float)
+    VFATGeometryDict['Short'][7]['y'] = np.asarray([89.0949999999999,105.75,105.75,89.0949999999999],dtype=float)
+    VFATGeometryDict['Short'][8]['x'] = np.asarray([-3.83938562003834,-4.14080692494689,4.14080692494689,3.83938562003834],dtype=float)
+    VFATGeometryDict['Short'][8]['y'] = np.asarray([0,10.206,10.206,0],dtype=float)
+    VFATGeometryDict['Short'][9]['x'] = np.asarray([-4.14080692494689,-4.44222822985544,4.44222822985544,4.14080692494689],dtype=float)
+    VFATGeometryDict['Short'][9]['y'] = np.asarray([10.206,20.412,20.412,10.206],dtype=float)
+    VFATGeometryDict['Short'][10]['x'] = np.asarray([-4.44222822985544,-4.79536310569235,4.79536310569235,4.44222822985544],dtype=float)
+    VFATGeometryDict['Short'][10]['y'] = np.asarray([20.412,32.369,32.369,20.412],dtype=float)
+    VFATGeometryDict['Short'][11]['x'] = np.asarray([-4.79536310569235,-5.14849798152926,5.14849798152926,4.79536310569235],dtype=float)
+    VFATGeometryDict['Short'][11]['y'] = np.asarray([32.369,44.326,44.326,32.369],dtype=float)
+    VFATGeometryDict['Short'][12]['x'] = np.asarray([-5.14849798152926,-5.56365370199756,5.56365370199756,5.14849798152926],dtype=float)
+    VFATGeometryDict['Short'][12]['y'] = np.asarray([44.326,58.383,58.383,44.326],dtype=float)
+    VFATGeometryDict['Short'][13]['x'] = np.asarray([-5.56365370199756,-5.97880942246586,5.97880942246586,5.56365370199756],dtype=float)
+    VFATGeometryDict['Short'][13]['y'] = np.asarray([58.383,72.44,72.44,58.383],dtype=float)
+    VFATGeometryDict['Short'][14]['x'] = np.asarray([-5.97880942246586,-6.47069378786385,6.47069378786385,5.97880942246586],dtype=float)
+    VFATGeometryDict['Short'][14]['y'] = np.asarray([72.4399999999999,89.0949999999999,89.0949999999999,72.4399999999999],dtype=float)
+    VFATGeometryDict['Short'][15]['x'] = np.asarray([-6.47069378786385,-6.96257815326184,6.96257815326184,6.47069378786385],dtype=float)
+    VFATGeometryDict['Short'][15]['y'] = np.asarray([89.0949999999999,105.75,105.75,89.0949999999999],dtype=float)
+    VFATGeometryDict['Short'][16]['x'] = np.asarray([3.83938562003834,4.14080692494689,12.4513908518566,11.5450181214881],dtype=float)
+    VFATGeometryDict['Short'][16]['y'] = np.asarray([0,10.206,10.206,0],dtype=float)
+    VFATGeometryDict['Short'][17]['x'] = np.asarray([4.14080692494689,4.44222822985544,13.3577635822252,12.4513908518566],dtype=float)
+    VFATGeometryDict['Short'][17]['y'] = np.asarray([10.206,20.412,20.412,10.206],dtype=float)
+    VFATGeometryDict['Short'][18]['x'] = np.asarray([4.44222822985544,4.79536310569235,14.4196388259069,13.3577635822252],dtype=float)
+    VFATGeometryDict['Short'][18]['y'] = np.asarray([20.412,32.369,32.369,20.412],dtype=float)
+    VFATGeometryDict['Short'][19]['x'] = np.asarray([4.79536310569235,5.14849798152926,15.4815140695887,14.4196388259069],dtype=float)
+    VFATGeometryDict['Short'][19]['y'] = np.asarray([32.369,44.326,44.326,32.369],dtype=float)
+    VFATGeometryDict['Short'][20]['x'] = np.asarray([5.14849798152926,5.56365370199756,16.7298857598484,15.4815140695887],dtype=float)
+    VFATGeometryDict['Short'][20]['y'] = np.asarray([44.326,58.383,58.383,44.326],dtype=float)
+    VFATGeometryDict['Short'][21]['x'] = np.asarray([5.56365370199756,5.97880942246586,17.9782574501081,16.7298857598484],dtype=float)
+    VFATGeometryDict['Short'][21]['y'] = np.asarray([58.383,72.44,72.44,58.383],dtype=float)
+    VFATGeometryDict['Short'][22]['x'] = np.asarray([5.97880942246586,6.47069378786385,19.4573518871341,17.9782574501081],dtype=float)
+    VFATGeometryDict['Short'][22]['y'] = np.asarray([72.4399999999999,89.0949999999999,89.0949999999999,72.4399999999999],dtype=float)
+    VFATGeometryDict['Short'][23]['x'] = np.asarray([6.47069378786385,6.96257815326184,20.9364463241602,19.4573518871341],dtype=float)
+    VFATGeometryDict['Short'][23]['y'] = np.asarray([89.0949999999999,105.75,105.75,89.0949999999999],dtype=float)
+    VFATGeometryDict['Long'][0]['x'] = np.asarray([-3.83938562003834,-4.17332356777506,-12.5491682745625,-11.5450181214881],dtype=float)
+    VFATGeometryDict['Long'][0]['y'] = np.asarray([0,11.307,11.307,0],dtype=float)
+    VFATGeometryDict['Long'][1]['x'] = np.asarray([-4.17332356777506,-4.50726151551178,-13.5533184276368,-12.5491682745625],dtype=float)
+    VFATGeometryDict['Long'][1]['y'] = np.asarray([11.307,22.614,22.614,11.307],dtype=float)
+    VFATGeometryDict['Long'][2]['x'] = np.asarray([-4.50726151551178,-4.90466746092129,-14.7483166110425,-13.5533184276368],dtype=float)
+    VFATGeometryDict['Long'][2]['y'] = np.asarray([22.614,36.07,36.07,22.614],dtype=float)
+    VFATGeometryDict['Long'][3]['x'] = np.asarray([-4.90466746092129,-5.30207340633079,-15.9433147944483,-14.7483166110425],dtype=float)
+    VFATGeometryDict['Long'][3]['y'] = np.asarray([36.07,49.526,49.526,36.07],dtype=float)
+    VFATGeometryDict['Long'][4]['x'] = np.asarray([-5.30207340633079,-5.77777328465355,-17.3737425397006,-15.9433147944483],dtype=float)
+    VFATGeometryDict['Long'][4]['y'] = np.asarray([49.526,65.633,65.633,49.526],dtype=float)
+    VFATGeometryDict['Long'][5]['x'] = np.asarray([-5.77777328465355,-6.2534731629763,-18.804170284953,-17.3737425397006],dtype=float)
+    VFATGeometryDict['Long'][5]['y'] = np.asarray([65.633,81.74,81.74,65.633],dtype=float)
+    VFATGeometryDict['Long'][6]['x'] = np.asarray([-6.2534731629763,-6.82657530110586,-20.5274862591644,-18.804170284953],dtype=float)
+    VFATGeometryDict['Long'][6]['y'] = np.asarray([81.74,101.145,101.145,81.74],dtype=float)
+    VFATGeometryDict['Long'][7]['x'] = np.asarray([-6.82657530110586,-7.39967743923543,-22.2508022333757,-20.5274862591644],dtype=float)
+    VFATGeometryDict['Long'][7]['y'] = np.asarray([101.145,120.55,120.55,101.145],dtype=float)
+    VFATGeometryDict['Long'][8]['x'] = np.asarray([-3.83938562003834,-4.17332356777506,4.17332356777506,3.83938562003834],dtype=float)
+    VFATGeometryDict['Long'][8]['y'] = np.asarray([0,11.307,11.307,0],dtype=float)
+    VFATGeometryDict['Long'][9]['x'] = np.asarray([-4.17332356777506,-4.50726151551178,4.50726151551178,4.17332356777506],dtype=float)
+    VFATGeometryDict['Long'][9]['y'] = np.asarray([11.307,22.614,22.614,11.307],dtype=float)
+    VFATGeometryDict['Long'][10]['x'] = np.asarray([-4.50726151551178,-4.90466746092129,4.90466746092129,4.50726151551178],dtype=float)
+    VFATGeometryDict['Long'][10]['y'] = np.asarray([22.614,36.07,36.07,22.614],dtype=float)
+    VFATGeometryDict['Long'][11]['x'] = np.asarray([-4.90466746092129,-5.30207340633079,5.30207340633079,4.90466746092129],dtype=float)
+    VFATGeometryDict['Long'][11]['y'] = np.asarray([36.07,49.526,49.526,36.07],dtype=float)
+    VFATGeometryDict['Long'][12]['x'] = np.asarray([-5.30207340633079,-5.77777328465355,5.77777328465355,5.30207340633079],dtype=float)
+    VFATGeometryDict['Long'][12]['y'] = np.asarray([49.526,65.633,65.633,49.526],dtype=float)
+    VFATGeometryDict['Long'][13]['x'] = np.asarray([-5.77777328465355,-6.2534731629763,6.2534731629763,5.77777328465355],dtype=float)
+    VFATGeometryDict['Long'][13]['y'] = np.asarray([65.633,81.74,81.74,65.633],dtype=float)
+    VFATGeometryDict['Long'][14]['x'] = np.asarray([-6.2534731629763,-6.82657530110586,6.82657530110586,6.2534731629763],dtype=float)
+    VFATGeometryDict['Long'][14]['y'] = np.asarray([81.74,101.145,101.145,81.74],dtype=float)
+    VFATGeometryDict['Long'][15]['x'] = np.asarray([-6.82657530110586,-7.39967743923543,7.39967743923543,6.82657530110586],dtype=float)
+    VFATGeometryDict['Long'][15]['y'] = np.asarray([101.145,120.55,120.55,101.145],dtype=float)
+    VFATGeometryDict['Long'][16]['x'] = np.asarray([3.83938562003834,4.17332356777506,12.5491682745625,11.5450181214881],dtype=float)
+    VFATGeometryDict['Long'][16]['y'] = np.asarray([0,11.307,11.307,0],dtype=float)
+    VFATGeometryDict['Long'][17]['x'] = np.asarray([4.17332356777506,4.50726151551178,13.5533184276368,12.5491682745625],dtype=float)
+    VFATGeometryDict['Long'][17]['y'] = np.asarray([11.307,22.614,22.614,11.307],dtype=float)
+    VFATGeometryDict['Long'][18]['x'] = np.asarray([4.50726151551178,4.90466746092129,14.7483166110425,13.5533184276368],dtype=float)
+    VFATGeometryDict['Long'][18]['y'] = np.asarray([22.614,36.07,36.07,22.614],dtype=float)
+    VFATGeometryDict['Long'][19]['x'] = np.asarray([4.90466746092129,5.30207340633079,15.9433147944483,14.7483166110425],dtype=float)
+    VFATGeometryDict['Long'][19]['y'] = np.asarray([36.07,49.526,49.526,36.07],dtype=float)
+    VFATGeometryDict['Long'][20]['x'] = np.asarray([5.30207340633079,5.77777328465355,17.3737425397006,15.9433147944483],dtype=float)
+    VFATGeometryDict['Long'][20]['y'] = np.asarray([49.526,65.633,65.633,49.526],dtype=float)
+    VFATGeometryDict['Long'][21]['x'] = np.asarray([5.77777328465355,6.2534731629763,18.804170284953,17.3737425397006],dtype=float)
+    VFATGeometryDict['Long'][21]['y'] = np.asarray([65.633,81.74,81.74,65.633],dtype=float)
+    VFATGeometryDict['Long'][22]['x'] = np.asarray([6.2534731629763,6.82657530110586,20.5274862591644,18.804170284953],dtype=float)
+    VFATGeometryDict['Long'][22]['y'] = np.asarray([81.74,101.145,101.145,81.74],dtype=float)
+    VFATGeometryDict['Long'][23]['x'] = np.asarray([6.82657530110586,7.39967743923543,22.2508022333757,20.5274862591644],dtype=float)
+    VFATGeometryDict['Long'][23]['y'] = np.asarray([101.145,120.55,120.55,101.145],dtype=float)
+
+    ## Additional polygon to standardize Axis ranges
+    shape_x = np.asarray([-120.55/2,-120.55/2,120.55/2,120.55/2],dtype=float)
+    shape_y = np.asarray([125.,125.01,125.01,125.],dtype=float)
+    ## END OF GEOMETRY DEFINITION
+    h2p = ROOT.TH2Poly()
+    if efficiency_target in ["ML1","ML2","PL1","PL2"]:
+        endcapTag = efficiency_target
+        for chamber_number in range(1,37):
+            chamberSize = "Short" if chamber_number%2 == 1 else "Long"
+            
+            region = 1 if endcapTag[0]=="P" else -1
+            chamber_ID = ReChLa2chamberName(region,chamber_number,endcapTag[-1])           
+            
+            angle_deg = -90 + (chamber_number - 1)*10## degrees
+            angle_rad = np.radians(angle_deg)
+            for VFATN in range(24):
+
+                original_x = VFATGeometryDict[chamberSize][VFATN]['x']
+                original_y = VFATGeometryDict[chamberSize][VFATN]['y']
+
+                ## fix needed to respect GE11 installation, long SCs have Drift facing the Interaction Point. Short SCs have ReadOut Board facing the IP
+                ## Applying reflection along y axis
+                if (region == 1 and chamber_number % 2 == 0) or (region == -1 and chamber_number % 2 == 1):
+                    original_x = -original_x
+
+                translated_x = original_x
+                translated_y = original_y + 130 ## GE11 ~ R = 130 cm                
+                rotated_and_translated_x = np.asarray([ translated_x[i]*np.cos(angle_rad) - translated_y[i]*np.sin(angle_rad) for i in range(len(translated_x)) ],dtype=float)
+                rotated_and_translated_y = np.asarray([ translated_x[i]*np.sin(angle_rad) + translated_y[i]*np.cos(angle_rad) for i in range(len(translated_x)) ],dtype=float)
+
+                VFAT_den = EfficiencyDictVFAT[endcapTag][chamber_ID][VFATN]['den'] 
+                VFAT_num = EfficiencyDictVFAT[endcapTag][chamber_ID][VFATN]['num'] 
+                
+                if VFAT_den == 0:
+                    efficiency = 0 ## Bin has no text in case of no prop hit
+                elif VFAT_num == 0:
+                    efficiency = 0.01 ## Avoid empty label when printing it with text
+                else:
+                    efficiency = round(float(VFAT_num)/VFAT_den,2)
+
+
+                selected_bin = h2p.AddBin(4,rotated_and_translated_x,rotated_and_translated_y)
+                h2p.SetBinContent(selected_bin,efficiency)
+                h2p.SetMarkerSize(.3) ## Reduces the text size when drawing the option "COLZ TEXT"
+                
+                h2p.GetXaxis().SetTitle("Glb x (cm)")
+                h2p.GetYaxis().SetTitle("Glb y (cm)")
+    else:
+        chamber_ID = efficiency_target
+        re_ch_la_list = chamberName2ReChLa(chamber_ID)
+        re = re_ch_la_list[0]
+        ch = re_ch_la_list[1]
+        la = re_ch_la_list[2]
+        chamberSize = "Short" if ch%2 == 1 else "Long"
+        endcapTag = EndcapLayer2label(re,la)
+        
+
+        for VFATN in range(24):
+            selected_bin = h2p.AddBin(4,VFATGeometryDict[chamberSize][VFATN]['x'],VFATGeometryDict[chamberSize][VFATN]['y'])
+                
+            VFAT_den = EfficiencyDictVFAT[endcapTag][chamber_ID][VFATN]['den'] 
+            VFAT_num = EfficiencyDictVFAT[endcapTag][chamber_ID][VFATN]['num'] 
+                
+            if VFAT_den == 0:
+                efficiency = 0 ## Bin has no text in case of no prop hit
+            elif VFAT_num == 0:
+                    efficiency = 0.01 ## Avoid empty label when printing it with text
+            else:
+                efficiency = round(float(VFAT_num)/VFAT_den,2)
+
+            h2p.SetBinContent(selected_bin,efficiency)
+
+        h2p.AddBin(4,shape_x,shape_y)
+
+    # h2p.SetMaximum(1.1)
+    h2p.SetMinimum(0)
+    h2p.SetTitle(efficiency_target+"_2DEffVFAT")
+    h2p.SetName(efficiency_target+"_2DEffVFAT")
+    h2p.GetYaxis().SetTickLength(0.005)
+    h2p.GetYaxis().SetTitleOffset(1.3)
+    h2p.GetXaxis().SetTickLength(0.005)
+    h2p.GetYaxis().SetLabelSize(0.03)
+    h2p.GetXaxis().SetLabelSize(0.03)
+    h2p.SetStats(False)
+    return h2p
+
 
 def generateEfficiencyPlotbyPt(sourceDict,input_region=[-1,1],input_layer=[1,2]):
     ## Transforming in list
@@ -488,6 +726,7 @@ def generateEfficiencyPlotbyPt(sourceDict,input_region=[-1,1],input_layer=[1,2])
         Plot_Container[chambers].GetXaxis().SetTitle("pt (GeV)")
         Plot_Container[chambers].GetYaxis().SetTitle("Efficiency")
         Plot_Container[chambers].SetMaximum(1.1)
+        Plot_Container[chambers].SetMinimum(0)
         Plot_Container[chambers].SetTitle(chambers+"_"+title)
         Plot_Container[chambers].SetName(chambers+"_"+title)
         Plot_Container[chambers].SetLineColor(ColorAssociation[chambers])
@@ -514,7 +753,7 @@ def generateEfficiencyPlotbyPt(sourceDict,input_region=[-1,1],input_layer=[1,2])
     
     
     for chambers in ['All','Long','Short']:
-        Plot_Container[chambers].Divide(TH1F_TempContainer[chambers]['num'],TH1F_TempContainer[chambers]['den'])
+        Plot_Container[chambers].Divide(TH1F_TempContainer[chambers]['num'],TH1F_TempContainer[chambers]['den'],"B")
 
     return Plot_Container['Short'],Plot_Container['Long'],Plot_Container['All']
 
@@ -651,7 +890,7 @@ def generateEfficiencyPlot2DGE11(sourceDict,input_region=1,input_layer=1,debug=F
     DenTH2D.GetYaxis().SetTitle("GEM EtaPartition")
     DenTH2D.GetYaxis().SetTitleSize(0.05)
 
-    Summary.Divide(SummaryNum,SummaryDen)
+    Summary.Divide(SummaryNum,SummaryDen,"B")
     Summary.GetXaxis().SetRangeUser(0.,36.5)
     Summary.GetYaxis().SetTickLength(0.005)
     Summary.GetXaxis().SetTickLength(0.005)
@@ -726,6 +965,68 @@ def printSummary(sourceDict,matching_variables,ResidualCutOff,matching_variable_
             if debug: print "WARNING"
         print "#############"
 
+def initializeMatchingTree():
+    generalMatching = {}
+    recHit_Matching = {}
+    propHit_Matching = {}
+    
+    generalMatching['event'] = array('i', [0])
+    generalMatching['lumiblock'] = array('i', [0])
+    generalMatching['chamber'] = array('i', [0])
+    generalMatching['region'] = array('i', [0])
+    generalMatching['layer'] = array('i', [0])
+    generalMatching['etaPartition'] = array('i', [0])
+
+    recHit_Matching['loc_x'] = array('f', [0.])
+    recHit_Matching['glb_x'] = array('f', [0.])
+    recHit_Matching['glb_y'] = array('f', [0.])
+    recHit_Matching['glb_z'] = array('f', [0.])
+    recHit_Matching['glb_r'] = array('f', [0.])
+    recHit_Matching['glb_phi'] = array('f', [0.])
+    recHit_Matching['firstStrip'] = array('i', [0])
+    recHit_Matching['cluster_size'] = array('i', [0])
+
+    propHit_Matching['loc_x'] = array('f', [0.])
+    propHit_Matching['loc_y'] = array('f', [0.])
+    propHit_Matching['glb_x'] = array('f', [0.])
+    propHit_Matching['glb_y'] = array('f', [0.])
+    propHit_Matching['glb_z'] = array('f', [0.])
+    propHit_Matching['glb_r'] = array('f', [0.])
+    propHit_Matching['glb_phi'] = array('f', [0.])
+    propHit_Matching['err_glb_r'] = array('f', [0.])
+    propHit_Matching['err_glb_phi'] = array('f', [0.])
+    propHit_Matching['pt'] = array('f', [0.])
+    propHit_Matching['mu_propagated_isGEM'] = array('i', [0])
+    propHit_Matching['STA_Normchi2'] = array('f', [0.])
+    propHit_Matching['nME1Hits'] = array('i', [0])
+    propHit_Matching['nME2Hits'] = array('i', [0])
+    propHit_Matching['nME3Hits'] = array('i', [0])
+    propHit_Matching['nME4Hits'] = array('i', [0])
+
+    t_out = ROOT.TTree("MatchingTree", "MatchingTree")
+    for key in generalMatching.keys():
+        if type(generalMatching[key][0]) == float: label="F"
+        elif type(generalMatching[key][0]) == int: label="I"
+        t_out.Branch(key, generalMatching[key], key+"/"+label)
+    for key in recHit_Matching.keys():
+        if type(recHit_Matching[key][0]) == float: label="F"
+        elif type(recHit_Matching[key][0]) == int: label="I"
+        t_out.Branch("recHit_"+key, recHit_Matching[key], "recHit_"+key+"/"+label)
+    for key in propHit_Matching.keys():
+        if type(propHit_Matching[key][0]) == float: label="F"
+        elif type(propHit_Matching[key][0]) == int: label="I"
+        t_out.Branch("propHit_"+key, propHit_Matching[key], "propHit_"+key+"/"+label)
+    
+    return t_out,generalMatching,recHit_Matching,propHit_Matching
+
+def fillMatchingTreeArray(PropHitonEta,prop_hit_index,RecHitonEta,reco_hit_index,propHit_Matching,recHit_Matching):
+    for key in recHit_Matching.keys():
+        recHit_Matching[key][0] =RecHitonEta[key][reco_hit_index]
+    for key in propHit_Matching.keys():
+        propHit_Matching[key][0] =PropHitonEta[key][prop_hit_index]
+    
+    return recHit_Matching,propHit_Matching
 
 if __name__ == '__main__':
+    print generateClopperPeasrsonInterval(4084,4459)
     pass
