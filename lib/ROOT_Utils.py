@@ -1,15 +1,10 @@
 import ROOT
-import array
-import csv
-from os import listdir
+import glob
 import os.path
 import numpy as np
 import math
-import xlrd
-import sys
 import fnmatch
 import CMS_lumi, tdrstyle
-import collections
 
 def GetROOTType(obj):
     type_found = type(obj)
@@ -357,7 +352,7 @@ def Generate_Uncertainity_Plot(dict_of_fit,reference_geometry):
 
     return multigraph
 
-## Save the ROOT obj in the TFile according to the path specified in directory.
+## Save the ROOT obj in the TFile according to the path specified in directory. If a ROOT obj w/ same name exists, skip
 def writeToTFile(file,obj,directory=None):
     if directory != None:
         if bool(file.GetDirectory(directory)):
@@ -366,6 +361,10 @@ def writeToTFile(file,obj,directory=None):
             file.mkdir(directory)
             Tdir = file.GetDirectory(directory)
         Tdir.cd()
+        
+        # Avoid duplicate
+        if Tdir.GetListOfKeys().Contains(obj.GetName()): return
+
     else:
         file.cd()
     
@@ -373,8 +372,8 @@ def writeToTFile(file,obj,directory=None):
 
 def files_in_folder(folder):
     files  = []
-    mypath=folder+"/"
-    files += [mypath+f for f in listdir(mypath) if os.path.isfile(os.path.join(mypath, f))]
+    mypath=folder+"/*"          #/*/*/*" ## for Collision data
+    files += [f for f in glob.glob(mypath) if os.path.isfile(f)]
     return files
 
 # bool values are handled with custom type in the ntuples.
@@ -384,3 +383,8 @@ def ROOTBitReferenceVector_to_BoolList(input):
     for j in input:
         output.append(bool(j))
     return output
+
+if __name__ == '__main__':
+    mp = Map_TFile("/eos/cms/store/group/dpg_gem/comm_gem/P5_Commissioning/2021/GEMCommonNtuples/CRAFT/346104_DPGOTest/MuDPGNtuple_1-4.root")
+    printMap(mp)
+    pass

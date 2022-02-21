@@ -228,5 +228,7 @@ def GetOverallChamberThreshold(source_folder,chamberID,verbose=False):
         
 
 if __name__ == "__main__":
-    print GetOverallVFATThreshold("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/THR_Data/THR_ARM_DAC/SBit100","GE11-M-17L1-S",23,verbose=True)
-    pass
+        for VFAT_N in range(24):
+                print VFAT_N,GetOverallVFATThreshold("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/THR_Data/THR_ARM_DAC/SBit10000_Trimming","GE11-M-16L1-L",VFAT_N,verbose=True)
+        pass
+

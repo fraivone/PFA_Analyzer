@@ -29,7 +29,6 @@
   ```
   git clone https://github.com/gem-sw/pfa.git
   cd PFA_Analyzer
-  source setup.sh
   ```
   ## Single Run Usage
 

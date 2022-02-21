@@ -248,7 +248,7 @@ def incidenceAngle_vs_Eff(sourceDict,input_region=1,input_layer=1):
     input_layer = [input_layer] if not isinstance(input_layer, list) else input_layer
 
     title = "GE11"+reg_tag_string+lay_tag_string
-    angle_nbins,angle_min,angle_max = 10,0,1.
+    angle_nbins,angle_min,angle_max = 20,0,1.
     
     
     Eff_Plot = ROOT.TGraphAsymmErrors()
@@ -256,7 +256,7 @@ def incidenceAngle_vs_Eff(sourceDict,input_region=1,input_layer=1):
     DenTH1F = ROOT.TH1F(title+"_incidenceAngle_Den",title+"_incidenceAngle_Den",angle_nbins,angle_min,angle_max)
         
 
-    for j in range(0,10):
+    for j in range(0,20):
         etaPartitionRecHits = 0
         etaPartitionPropHits = 0
         for etaPartitionID,value in sourceDict.items():
@@ -310,7 +310,7 @@ def generate1DResidualContainer(matching_variables,nbins,ResidualCutOff):
     output_dict = {}
     for mv in matching_variables:
         output_dict[mv] = {}
-        minB = -ResidualCutOff[mv]*2
+        minB = -ResidualCutOff["glb_rdphi"]*2
 
         for (re,la) in [(1,1),(1,2),(-1,1),(-1,2)]:
             endcap_key = EndcapLayer2label(re,la)
@@ -322,7 +322,7 @@ def generate1DResidualContainer(matching_variables,nbins,ResidualCutOff):
                 for eta in range(1,9)+["All"]:
                     titleTH1 = chID+"_eta"+str(eta)+"_"
                     output_dict[mv][endcap_key][chID][eta]={"Residual":ROOT.TH1F(titleTH1+"Residual",titleTH1+"Residual",nbins,minB,-minB)}
-                    output_dict[mv][endcap_key][chID][eta]["Residual"].GetXaxis().SetTitle("ErrR (cm)")
+                    output_dict[mv][endcap_key][chID][eta]["Residual"].GetXaxis().SetTitle("#Deltardphi (cm)")
     return output_dict
 
 # dict[matchingVar][endcaptag][chamberID][VFAT]
@@ -430,7 +430,7 @@ def passCut(PropHitonEta,prop_hit_index,maxPropR_Err=0.7,maxPropPhi_Err=0.001,fi
 ## Knowing that MUST BE Num < Den
 ## Not needed...ROOT can do it automagically with TGraphAsymmErrors::DIVIDE
 def generateClopperPeasrsonInterval(num,den):
-    confidenceLevel = 0.95
+    confidenceLevel = 0.68
     alpha = 1 - confidenceLevel
     
     lowerLimit = ROOT.Math.beta_quantile(alpha/2,num,den-num + 1)
@@ -759,7 +759,7 @@ def generateEfficiencyPlotbyPt(sourceDict,input_region=[-1,1],input_layer=[1,2])
 
 
 def generateEfficiencyDistribution(sourceDict):
-    EfficiencyDistribution = ROOT.TH1F("EfficiencyDistribution","EfficiencyDistribution",100,0.,1.)
+    EfficiencyDistribution = ROOT.TH1F("EfficiencyDistribution","EfficiencyDistribution",100,0,1.)
 
     Num = {}
     Den = {}
@@ -786,7 +786,9 @@ def generateEfficiencyDistribution(sourceDict):
         if (Den[k] != 0):
             Eff[k] = float(Num[k])/float(Den[k])
         EfficiencyDistribution.Fill(Eff[k])
-    
+    OverFlow = EfficiencyDistribution.GetBinContent(101)
+    UnderFlow = EfficiencyDistribution.GetBinContent(0)
+
     return EfficiencyDistribution
 
 
@@ -1027,6 +1029,33 @@ def fillMatchingTreeArray(PropHitonEta,prop_hit_index,RecHitonEta,reco_hit_index
     
     return recHit_Matching,propHit_Matching
 
+def store4evtDspl(name,run,lumi,evt):
+    evtDspl_dir = "/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/EvtDspl/"
+    with open(evtDspl_dir+name+".txt", 'a+') as f:
+        f.write(str(run)+":"+str(lumi)+":"+str(evt)+"\n")
+
+def printEfficiencyFromCSV(path):
+    file_path = path + "/MatchingSummary_glb_rdphi.csv"
+    print file_path,"\n"
+    print "Label","\t","Analyzed Chambers","\t","AVG pt","\t","Matched","\t","Propagated","\t","Eff. 68%CL"
+
+    df = pd.read_csv(file_path, sep=',')
+    
+    Matched = df["matchedRecHit"].sum()
+    Propagated = df["propHit"].sum()
+    AVGpt  =  round(df["AVG_pt"].mean(),4)
+    analyzed_Chambers = float(len(df))/8
+    
+    for eta in range(1,9):
+        df_temp = df[ df["etaPartition"] == eta ]
+        etaMatched = df_temp["matchedRecHit"].sum()
+        etaProp = df_temp["propHit"].sum()
+        AVGpteta  = round(df_temp["AVG_pt"].mean(),4)
+
+        # print "Eta",eta,"\t",AVGpteta,"\t",etaMatched,"\t",etaProp,"\t",generateClopperPeasrsonInterval(etaMatched,etaProp)
+    print "GE11","\t",analyzed_Chambers,"\t", AVGpt,"\t",Matched,"\t",Propagated,"\t",generateClopperPeasrsonInterval(Matched,Propagated)
+    print "##############\n"  
+
 if __name__ == '__main__':
-    print generateClopperPeasrsonInterval(4084,4459)
+    print generateClopperPeasrsonInterval(1800,2100)
     pass
