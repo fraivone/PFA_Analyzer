@@ -26,10 +26,12 @@ parser.add_argument('--VFATOFF', type=str , help="file_path to the file containi
 parser.add_argument('--outputname', type=str, help="output file name",required=False)
 parser.add_argument('--fiducialR','-fR', type=float , help="fiducial cut along R axis",required=False)
 parser.add_argument('--fiducialPhi','-fP', type=float , help="fiducial cut along phi axis",required=False)
+parser.add_argument('--maxErrPropR', type=float , help="max error on propagated R in order to accept the muon",required=False)
+parser.add_argument('--maxErrPropPhi', type=float , help="max error on propagated phi in order to accept the muon",required=False)
 parser.add_argument('--DLE', default=False, action='store_true',help="Swtiches on the Double Layer Efficiency (DLE) analisys. False by default",required=False)
 parser.add_argument('--FD', default=False, action='store_true',help="When enabled, allows the storage of all GEM RecHit Digis. False by default, which means that GEM RecHit Digis are stored only for EVTs in which STA propagation hits GEM",required=False)
 parser.add_argument('--verbose', default=False, action='store_true',help="Verbose printing",required=False)
-parser.add_argument('--dataset','-ds', type=str,help="Path to the folder containing the NTuples to be analyzed",required=True,nargs='*')
+parser.add_argument('--dataset','-ds', type=str,help="TAG to the folder containing the NTuples to be analyzed",required=True,nargs='*')
 
 parser.add_argument('--minME1', type=int, help="Min number of ME1 hits",required=False)
 parser.add_argument('--minME2', type=int, help="Min number of ME2 hits",required=False)
@@ -45,9 +47,12 @@ parser.set_defaults(minME3=0)
 parser.set_defaults(minME4=0)
 parser.set_defaults(fiducialR=1)
 parser.set_defaults(fiducialPhi=0.005)
+parser.set_defaults(maxErrPropR=1)
+parser.set_defaults(maxErrPropPhi=0.01)
 parser.set_defaults(outputname=time.strftime("%-y%m%d_%H%M"))
 args = parser.parse_args()
 
+chamberForEventDisplay = ["GE11-M-27L2-S"]
 
 
 ROOT.gROOT.SetBatch(True)
@@ -68,7 +73,7 @@ for folder in args.dataset:
     all_folders = [folder for folder in all_folders if "L1A" not in folder and "new" not in folder] 
     for s in all_folders: temp_files += files_in_folder(s) 
     files += [f for f in temp_files if ".root" in f]
-#files = ["/afs/cern.ch/user/f/fivone/Documents/NTuplizer/ForShawn/CMSSW_11_2_4/src/MuDPGAnalysis/MuonDPGNtuples/test/MuDPGNtuple_MaskedStrips.root"]
+#files = ["/afs/cern.ch/user/f/fivone/Documents/NTuplizer/ForShawn/CMSSW_11_2_4/src/MuDPGAnalysis/MuonDPGNtuples/test/MuDPGNtuple_StripsIncrementByFour.root"]
 matching_variables = ['glb_phi','glb_rdphi']
 matching_variable_units = {'glb_phi':'rad','glb_rdphi':'cm'}
 ResidualCutOff= {'glb_phi':args.phi_cut,'glb_rdphi':args.rdphi_cut}
@@ -76,8 +81,8 @@ ResidualCutOff= {'glb_phi':args.phi_cut,'glb_rdphi':args.rdphi_cut}
 DLE = args.DLE
 FD = args.FD
 fiducialCut = True
-maxErrOnPropR = 1
-maxErrOnPropPhi = 0.01
+maxErrOnPropR = args.maxErrPropR
+maxErrOnPropPhi = args.maxErrPropPhi
 fiducialR = args.fiducialR
 fiducialPhi = args.fiducialPhi
 CutminPt = args.minPt
@@ -290,6 +295,8 @@ for key_1 in ['Long','Short']:
 chain = ROOT.TChain("muNtupleProducer/MuDPGTree")
 
 print args.dataset, "TChaining ",len(files)," files..."
+print'\n'.join(files)
+print
 for fl in files:
     chain.Add(fl)
 ## Enabling only the branches which are actually in use
@@ -423,9 +430,8 @@ for chain_index,evt in enumerate(chain):
             continue
 
         propHitFromME11 = bool(evt.mu_propagated_isME11[PropHit_index])
-        if propHitFromME11:
+        if propHitFromME11:            
             PropHit_Dict.setdefault(PropHitChamberID,{'loc_x':[],'loc_y':[],'glb_x':[],'glb_y':[],'glb_z':[],'glb_r':[],'glb_phi':[],'pt':[],'etaP':[],'err_glb_r':[],'err_glb_phi':[],'Loc_dirX':[],'Loc_dirY':[],'Loc_dirZ':[],'mu_propagated_isME11':[],'mu_propagated_EtaPartition_rMax':[],'mu_propagated_EtaPartition_rMin':[],'mu_propagated_isGEM':[],'mu_propagated_EtaPartition_phiMin':[],'mu_propagated_EtaPartition_phiMax':[],'STA_Normchi2':[],'nME1Hits':[],'nME2Hits':[],'nME3Hits':[],'nME4Hits':[]})
-
             prop_glb_r = evt.mu_propagatedGlb_r[PropHit_index]
             prop_loc_x = evt.mu_propagatedLoc_x[PropHit_index]
 
@@ -433,7 +439,7 @@ for chain_index,evt in enumerate(chain):
                 if propHit2VFAT(prop_glb_r,prop_loc_x,etaP,region,chamber) in VFATOFFDict[PropHitChamberID]:
                     continue
 
-
+            
             PropHit_Dict[PropHitChamberID]['loc_x'].append(prop_loc_x)
             PropHit_Dict[PropHitChamberID]['loc_y'].append(evt.mu_propagatedLoc_y[PropHit_index])
             PropHit_Dict[PropHitChamberID]['glb_x'].append(evt.mu_propagatedGlb_x[PropHit_index])
@@ -493,6 +499,7 @@ for chain_index,evt in enumerate(chain):
     layer1etapID = 0
     layer2pt = 0
     layer2etapID = 0
+
     for etaPartitionID in PropHit_Dict.keys():
         
         region,chamber,layer,eta = getInfoFromEtaID(etaPartitionID)
@@ -513,7 +520,7 @@ for chain_index,evt in enumerate(chain):
             for pt in range(0,11):
                 EfficiencyDictGlobal[mv][etaPartitionID].setdefault(pt,{'num':0,'den':0})
                 EfficiencyDictLayer[mv][etaPartitionID].setdefault(pt,{'num':0,'den':0})
-            for j in range(0,10):
+            for j in range(0,20):
                 EfficiencyDictDirection[mv][etaPartitionID].setdefault(j,{'num':0,'den':0})
 
         isGoodTrack = []
@@ -530,7 +537,7 @@ for chain_index,evt in enumerate(chain):
                 EfficiencyDictVFAT['glb_phi'][endcapTag][current_chamber_ID][VFAT_propagated]['den'] += 1
                 EfficiencyDictVFAT['glb_rdphi'][endcapTag][current_chamber_ID][VFAT_propagated]['den'] += 1
 
-                angle_index = int ( (cos_of_alpha_list[index] * 10 ) )
+                angle_index = int ( (cos_of_alpha_list[index] * 20 ) )
                 EfficiencyDictDirection['glb_phi'][etaPartitionID][angle_index]['den'] += 1 
                 EfficiencyDictDirection['glb_rdphi'][etaPartitionID][angle_index]['den'] += 1 
 
@@ -598,9 +605,14 @@ for chain_index,evt in enumerate(chain):
 
 
         if etaPartitionID not in RecHit_Dict:
-            # print "Nothing to match on ", etaPartitionID
+            # if current_chamber_ID in chamberForEventDisplay: 
+            #     print "event",EventNumber
+            #     print "\t\tNothing to match on ", eta,"\t Match looked for phi = ",PropHitonEta['glb_phi']
+            #     for s in range(1,9):
+            #         sf =  region*(100*chamber+10*layer+s)
+            #         if sf in RecHit_Dict.keys(): print sf,"\t",RecHit_Dict[sf]
+                
             # print PropHit_Dict[etaPartitionID]['glb_phi']
-            # raw_input()
             #print "No rechit in etaPartitionID =  ",etaPartitionID
             continue
         else: 
@@ -672,7 +684,7 @@ for chain_index,evt in enumerate(chain):
                 VFAT_propagated = propHit2VFAT(PropHitonEta['glb_r'][prop_hit_index],PropHitonEta['loc_x'][prop_hit_index],eta,region,chamber)
                 EfficiencyDictVFAT[matchingVar][endcapTag][current_chamber_ID][VFAT_propagated]['num'] += 1
 
-                angle_index = int( cos_of_alpha_list[prop_hit_index] * 10)
+                angle_index = int( np.sqrt(PropHitonEta['Loc_dirX'][prop_hit_index]**2 + PropHitonEta['Loc_dirY'][prop_hit_index]**2) * 20)
                 EfficiencyDictDirection[matchingVar][etaPartitionID][angle_index]['num'] += 1
 
                 TH1Fresidual_collector[matchingVar][endcapTag][current_chamber_ID]["All"]["Residual"].Fill(glb_rdphi_residual)
@@ -732,6 +744,7 @@ for chain_index,evt in enumerate(chain):
                         layer2pt = PropHitonEta['pt'][prop_hit_index]
                     
             else:
+                #if current_chamber_ID in chamberForEventDisplay: store4evtDspl(outputname,RunNumber,LumiSection,EventNumber)
                 # print "Matching failed for ", etaPartitionID
                 # print PropHit_Dict[etaPartitionID]['glb_phi'], RecHit_Dict[etaPartitionID]['glb_phi']
                 # raw_input()

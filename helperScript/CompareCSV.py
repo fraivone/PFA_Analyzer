@@ -31,6 +31,8 @@ label_list = args.labels if args.labels is not None else args.inputs
 
 if len(label_list) != len(inputs):
     print "Parsed inputs and labels are different in number...\nExiting .."
+    print label_list
+    print inputs
     sys.exit(0)    
 
 ### ROOT style settings
@@ -62,7 +64,6 @@ for key in Multigraph_Dict.keys():
     Multigraph_Dict[key].GetXaxis().SetLimits(0.,36.5)
     Multigraph_Dict[key].GetXaxis().SetLabelSize(0.03)
     Multigraph_Dict[key].GetXaxis().SetTitle("Chamber Number")
-    Multigraph_Dict[key].SetMinimum(0)
     Multigraph_Dict[key].SetMaximum(1.1)
     Multigraph_Dict[key].GetYaxis().SetLabelSize(0.03)
     Multigraph_Dict[key].GetYaxis().SetTickLength(0.015)
@@ -137,7 +138,7 @@ for index,key in enumerate(Multigraph_Dict.keys()):
     c2.cd(index+1).SetGrid()
     Multigraph_Dict[key].Draw("0APE")
     
-    leg = c2.cd(index+1).BuildLegend(.1,.8,.4,1.)
+    leg = c2.cd(index+1).BuildLegend()
     leg.SetBorderSize(2)
     if enable_THR: 
         secondary_axis.Draw()
@@ -150,3 +151,4 @@ c2.Modified()
 c2.Update()
 c2.SaveAs("./Output/CompareCSV/"+output+".pdf")
 print "Your ouput \t","./Output/CompareCSV/"+output+".pdf"
+raw_input("Press any key to terminate...")
