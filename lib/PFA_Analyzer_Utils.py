@@ -3,6 +3,7 @@ import ROOT
 import numpy
 import pandas as pd
 from ROOT_Utils import *
+from EtaPartitionBoundaries import *
 import sys
 import json
 from array import array
@@ -376,7 +377,7 @@ def fillPlot2DResidualContainer(TH2Fresidual_collector,matching_variables,nbins)
                         TH2Fresidual_collector[key_1][key_2][key_3]['TH2F'].SetBinContent(x_bin,y_bin,AVG_Residual)
     return TH2Fresidual_collector
 
-def passCut(PropHitonEta,prop_hit_index,maxPropR_Err=0.7,maxPropPhi_Err=0.001,fiducialCutR=0.5,fiducialCutPhi=0.002,minPt=0.,maxChi2=9999999,minME1Hit=0,minME2Hit=0,minME3Hit=0,minME4Hit=0):
+def passCut(PropHitonEta,etaPID,prop_hit_index,maxPropR_Err=0.7,maxPropPhi_Err=0.001,fiducialCutR=0.5,fiducialCutPhi=0.002,minPt=0.,maxChi2=9999999,minME1Hit=0,minME2Hit=0,minME3Hit=0,minME4Hit=0):
     passedCut = True
     if PropHitonEta['err_glb_phi'][prop_hit_index] > maxPropPhi_Err:
         passedCut = False
@@ -396,8 +397,8 @@ def passCut(PropHitonEta,prop_hit_index,maxPropR_Err=0.7,maxPropPhi_Err=0.001,fi
         passedCut = False
 
     
-    PhiMin = PropHitonEta['mu_propagated_EtaPartition_phiMin'][prop_hit_index]
-    PhiMax = PropHitonEta['mu_propagated_EtaPartition_phiMax'][prop_hit_index]
+    PhiMin = boundaries[etaPID][1]
+    PhiMax = boundaries[etaPID][0]
     PropHitPhi = PropHitonEta['glb_phi'][prop_hit_index]
     PropHitPt = PropHitonEta['pt'][prop_hit_index]
 
@@ -420,9 +421,12 @@ def passCut(PropHitonEta,prop_hit_index,maxPropR_Err=0.7,maxPropPhi_Err=0.001,fi
     #     passedCut = False    
 
     ## Fiducial cut on etaP perimeter
-    if PropHitonEta['glb_r'][prop_hit_index] > (PropHitonEta['mu_propagated_EtaPartition_rMax'][prop_hit_index]-fiducialCutR):
+    ## check it does not exceed rmax
+    rMax = boundaries[etaPID][2]
+    rMin = boundaries[etaPID][3]
+    if PropHitonEta['glb_r'][prop_hit_index] > (rMax-fiducialCutR):
         passedCut = False
-    if PropHitonEta['glb_r'][prop_hit_index] < (PropHitonEta['mu_propagated_EtaPartition_rMin'][prop_hit_index]+fiducialCutR):
+    if PropHitonEta['glb_r'][prop_hit_index] < (rMin+fiducialCutR):
         passedCut = False
     return passedCut
 
