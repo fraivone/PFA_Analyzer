@@ -26,8 +26,8 @@ parser.add_argument('--VFATOFF', type=str , help="file_path to the file containi
 parser.add_argument('--outputname', type=str, help="output file name",required=False)
 parser.add_argument('--fiducialR','-fR', type=float , help="fiducial cut along R axis",required=False)
 parser.add_argument('--fiducialPhi','-fP', type=float , help="fiducial cut along phi axis",required=False)
-parser.add_argument('--maxErrPropR', type=float , help="max error on propagated R in order to accept the muon",required=False)
-parser.add_argument('--maxErrPropPhi', type=float , help="max error on propagated phi in order to accept the muon",required=False)
+parser.add_argument('--maxErrPropR', type=float , help="max error on propagated R in order to accept the muon (cm)",required=False)
+parser.add_argument('--maxErrPropPhi', type=float , help="max error on propagated phi in order to accept the muon (rad)",required=False)
 parser.add_argument('--DLE', default=False, action='store_true',help="Swtiches on the Double Layer Efficiency (DLE) analisys. False by default",required=False)
 parser.add_argument('--FD', default=False, action='store_true',help="When enabled, allows the storage of all GEM RecHit Digis. False by default, which means that GEM RecHit Digis are stored only for EVTs in which STA propagation hits GEM",required=False)
 parser.add_argument('--verbose', default=False, action='store_true',help="Verbose printing",required=False)
@@ -67,13 +67,8 @@ files = []
 
 
 for folder in args.dataset:
-    temp_files = []    
-    all_folders = subprocess.check_output(["find", "/eos/cms/store/group/dpg_gem/comm_gem/P5_Commissioning/2021", "-type", "d", "-name", "*"+str(folder)+"*"]).split("\n")
-    all_folders.remove('')
-    all_folders = [folder for folder in all_folders if "L1A" not in folder and "new" not in folder] 
-    for s in all_folders: temp_files += files_in_folder(s) 
-    files += [f for f in temp_files if ".root" in f]
-#files = ["/afs/cern.ch/user/f/fivone/Documents/NTuplizer/ForShawn/CMSSW_11_2_4/src/MuDPGAnalysis/MuonDPGNtuples/test/MuDPGNtuple_StripsIncrementByFour.root"]
+    files = files + files_in_folder(folder)
+
 matching_variables = ['glb_phi','glb_rdphi']
 matching_variable_units = {'glb_phi':'rad','glb_rdphi':'cm'}
 ResidualCutOff= {'glb_phi':args.phi_cut,'glb_rdphi':args.rdphi_cut}

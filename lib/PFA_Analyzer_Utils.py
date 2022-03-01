@@ -1043,19 +1043,33 @@ def printEfficiencyFromCSV(path):
     
     Matched = df["matchedRecHit"].sum()
     Propagated = df["propHit"].sum()
-    AVGpt  =  round(df["AVG_pt"].mean(),4)
+    if "AVG_pt" in df.columns: 
+        AVGpt  =  round(df["AVG_pt"].mean(),4)
+    else:
+        AVGpt = 0
     analyzed_Chambers = float(len(df))/8
     
     for eta in range(1,9):
         df_temp = df[ df["etaPartition"] == eta ]
         etaMatched = df_temp["matchedRecHit"].sum()
         etaProp = df_temp["propHit"].sum()
-        AVGpteta  = round(df_temp["AVG_pt"].mean(),4)
+        if "AVG_pt" in df.columns: 
+            AVGpteta  = round(df_temp["AVG_pt"].mean(),4)
+        else:
+            AVGpteta  = 0
+
 
         # print "Eta",eta,"\t",AVGpteta,"\t",etaMatched,"\t",etaProp,"\t",generateClopperPeasrsonInterval(etaMatched,etaProp)
     print "GE11","\t",analyzed_Chambers,"\t", AVGpt,"\t",Matched,"\t",Propagated,"\t",generateClopperPeasrsonInterval(Matched,Propagated)
     print "##############\n"  
 
 if __name__ == '__main__':
-    print generateClopperPeasrsonInterval(1800,2100)
+    printEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/CSV/MergedRuns_Prompt_700uA_100HZ_Trim_chi2_20/")
+    printEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/CSV/MergedRuns_Prompt_700uA_100HZ_Trim_chi2_15/")
+    printEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/CSV/MergedRuns_Prompt_700uA_100HZ_Trim_chi2_10/")
+    printEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/CSV/MergedRuns_Prompt_700uA_100HZ_Trim_chi2_8/")
+    printEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/CSV/MergedRuns_Prompt_700uA_100HZ_Trim_chi2_6/")
+    printEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/CSV/MergedRuns_Prompt_700uA_100HZ_Trim_chi2_4/")
+    printEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/CSV/MergedRuns_Prompt_700uA_100HZ_Trim_chi2_2/")
+
     pass

@@ -1,6 +1,6 @@
 import ROOT
 import glob
-import os.path
+import os
 import numpy as np
 import math
 import fnmatch
@@ -372,8 +372,11 @@ def writeToTFile(file,obj,directory=None):
 
 def files_in_folder(folder):
     files  = []
-    mypath=folder+"/*"          #/*/*/*" ## for Collision data
-    files += [f for f in glob.glob(mypath) if os.path.isfile(f)]
+
+    for root, dirnames, filenames in os.walk('/eos/cms/store/group/dpg_gem/comm_gem/P5_Commissioning/'):
+        if folder in root.split("/") and "GEMCommonNtuples" in root:
+            for filenames in fnmatch.filter(filenames,'*root'):
+                files.append(root+"/"+filenames)
     return files
 
 # bool values are handled with custom type in the ntuples.
@@ -385,6 +388,6 @@ def ROOTBitReferenceVector_to_BoolList(input):
     return output
 
 if __name__ == '__main__':
-    mp = Map_TFile("/eos/cms/store/group/dpg_gem/comm_gem/P5_Commissioning/2021/GEMCommonNtuples/CRAFT/346104_DPGOTest/MuDPGNtuple_1-4.root")
+    mp = Map_TFile("/eos/cms/store/group/dpg_gem/comm_gem/P5_Commissioning/2021/GEMCommonNtuples/CRUZET/347072_Prompt_Segments/220228_115144/0000/MuDPGNtuple_9.root")
     printMap(mp)
     pass

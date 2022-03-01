@@ -24,14 +24,7 @@ start_time = time.time()
 files = []
 
 for folder in args.dataset:
-    
-    temp_files = []
-    all_folders = subprocess.check_output(["find", "/eos/cms/store/group/dpg_gem/comm_gem/P5_Commissioning/2021", "-type", "d", "-name", "*"+str(folder)+"*"]).split("\n")
-    all_folders.remove('')
-    all_folders = [folder for folder in all_folders if "L1A" not in folder and "new" not in folder] 
-    for s in all_folders: 
-        temp_files += files_in_folder(s)
-    files += [f for f in temp_files if ".root" in f]
+    files = files + files_in_folder(folder)
 
 
 n = len(files)
