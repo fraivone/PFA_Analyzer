@@ -6,6 +6,7 @@ import pandas as pd
 import subprocess
 from argparse import RawTextHelpFormatter
 import json
+import re as regularExpression
 
 from lib.ROOT_Utils import *
 from lib.PFA_Analyzer_Utils import *
@@ -30,7 +31,8 @@ inputs_byDLE =  ["./Output/PFA_Analyzer_Output/CSV/"+i+"/MatchingSummary_glb_rdp
 exclusion_dict = args.exclusion
 output = args.output
 DLE = args.DLE
-run_list = [ int(i.split("_")[1]) for i in args.inputs]
+run_list = [int(regularExpression.findall(r'\d+', i)[0]) for i in args.inputs]
+
 
 print "\n########\nRun(s) to be merged:\t\t\t",str(run_list)[1:-1]
 

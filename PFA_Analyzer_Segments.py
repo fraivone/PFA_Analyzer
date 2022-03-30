@@ -3,6 +3,7 @@ import subprocess
 import sys
 import numpy as np
 import time
+import re as regularExpression
 import argparse
 import pandas as pd
 from argparse import RawTextHelpFormatter
@@ -46,12 +47,12 @@ parser.set_defaults(minME3=0)
 parser.set_defaults(minME4=0)
 parser.set_defaults(fiducialR=1)
 parser.set_defaults(fiducialPhi=0.005)
-parser.set_defaults(maxErrPropR=1)
+parser.set_defaults(maxErrPropR=2)
 parser.set_defaults(maxErrPropPhi=0.005)
 parser.set_defaults(outputname=time.strftime("%-y%m%d_%H%M"))
 args = parser.parse_args()
 
-chamberForEventDisplay = ["GE11-P-28L2-L"]
+chamberForEventDisplay = ["GE11-M-27L2-S"]
 
 
 ROOT.gROOT.SetBatch(True)
@@ -297,9 +298,7 @@ for fl in files:
 # 1. Disabling them all
 chain.SetBranchStatus("*",0);     
 
-
-branchList=["event_eventNumber","event_lumiBlock","event_runNumber","gemRecHit_region", "gemRecHit_chamber", "gemRecHit_layer", "gemRecHit_etaPartition", "gemRecHit_g_r", "gemRecHit_loc_x", "gemRecHit_g_x", "gemRecHit_g_y", "gemRecHit_g_z", "gemRecHit_g_phi", "gemRecHit_firstClusterStrip", "gemRecHit_cluster_size", "mu_propagated_region", "mu_propagated_chamber", "mu_propagated_layer", "mu_propagated_etaP", "mu_propagated_Outermost_z",  "mu_propagated_isME11", "mu_propagatedGlb_r", "mu_propagatedLoc_x", "mu_propagatedLoc_y", "mu_propagatedGlb_x", "mu_propagatedGlb_y", "mu_propagatedGlb_z", "mu_propagatedGlb_phi", "mu_propagatedGlb_errR", "mu_propagatedGlb_errPhi", "mu_propagatedLoc_dirX", "mu_propagatedLoc_dirY", "mu_propagatedLoc_dirZ", "mu_propagated_pt", "mu_propagated_isGEM", "mu_propagated_TrackNormChi2", "mu_propagated_nME1hits", "mu_propagated_nME2hits", "mu_propagated_nME3hits", "mu_propagated_nME4hits"]
-
+branchList=["event_eventNumber","event_lumiBlock","event_runNumber","gemRecHit_region", "gemRecHit_chamber", "gemRecHit_layer", "gemRecHit_etaPartition", "gemRecHit_g_r", "gemRecHit_loc_x", "gemRecHit_g_x", "gemRecHit_g_y", "gemRecHit_g_z", "gemRecHit_g_phi", "gemRecHit_firstClusterStrip", "gemRecHit_cluster_size", "mu_propagatedSeg_region", "mu_propagatedSeg_chamber", "mu_propagatedSeg_layer", "mu_propagatedSeg_etaP", "mu_propagatedSegGlb_r", "mu_propagatedSegLoc_x", "mu_propagatedSegLoc_y", "mu_propagatedSegGlb_x", "mu_propagatedSegGlb_y", "mu_propagatedSegGlb_z", "mu_propagatedSegGlb_phi", "mu_propagatedSegGlb_errR", "mu_propagatedSegGlb_errPhi", "mu_propagatedSegLoc_dirX", "mu_propagatedSegLoc_dirY", "mu_propagatedSegLoc_dirZ", "mu_propagatedSeg_pt"]
 # 2. Enabling the useful ones
 for b in branchList:
     chain.SetBranchStatus(b,1)
@@ -310,7 +309,7 @@ maxLS = 0
 print "\n#############\nStarting\n#############"
 
 try:
-    print "Analysing run(s): \t", [int(GetRunNumber(i)) for i in args.dataset]
+    print "Analysing run(s): \t", [int(regularExpression.sub("[^0-9]", "", i)) for i in args.dataset]
 except:
     pass
 
@@ -322,7 +321,7 @@ for chain_index,evt in enumerate(chain):
     if chain_index % 40000 ==0:
         print "[",time.strftime("%B %d - %H:%M:%S"),"]\t",round(float(chain_index)/float(chainEntries),3)*100,"%"
         
-    n_gemprop = len(evt.mu_propagated_chamber)
+    n_gemprop = len(evt.mu_propagatedSeg_chamber)
     n_gemrec = len(evt.gemRecHit_chamber)
     
     EventNumber = evt.event_eventNumber
@@ -403,36 +402,25 @@ for chain_index,evt in enumerate(chain):
     
     for PropHit_index in range(0,n_gemprop):
         
-        region = evt.mu_propagated_region[PropHit_index]
-        chamber = evt.mu_propagated_chamber[PropHit_index]
-        layer = evt.mu_propagated_layer[PropHit_index]
-        etaP = evt.mu_propagated_etaP[PropHit_index]
-        if etaP >= 9: ## from CMSSW_12_2_1 GE21 demonstrator is also included in the propagated chambers
-            continue
-
+        region = evt.mu_propagatedSeg_region[PropHit_index]
+        chamber = evt.mu_propagatedSeg_chamber[PropHit_index]
+        layer = evt.mu_propagatedSeg_layer[PropHit_index]
+        etaP = evt.mu_propagatedSeg_etaP[PropHit_index]
         PropHitChamberID = region*(100*chamber+10*layer+etaP)
         endcapKey = EndcapLayer2label(region,layer)
 
-        
-
-        outermost_z = evt.mu_propagated_Outermost_z[PropHit_index]
-        # is_incoming = evt.mu_propagated_isincoming[PropHit_index]
-
-        if region == 1 and outermost_z < 0:
-            continue
-        if region == -1 and outermost_z > 0:
-            continue
+    
 
         chamberID = ReChLa2chamberName(region,chamber,layer)
         ## discard chambers that were kept OFF from the analysis
         if chamberID in chamberOFFLS.keys() and (LumiSection in chamberOFFLS[chamberID] or -1 in chamberOFFLS[chamberID] ):
             continue
 
-        propHitFromME11 = bool(evt.mu_propagated_isME11[PropHit_index])
+        propHitFromME11 = True
         if propHitFromME11:            
             PropHit_Dict.setdefault(PropHitChamberID,{'loc_x':[],'loc_y':[],'glb_x':[],'glb_y':[],'glb_z':[],'glb_r':[],'glb_phi':[],'pt':[],'etaP':[],'err_glb_r':[],'err_glb_phi':[],'Loc_dirX':[],'Loc_dirY':[],'Loc_dirZ':[],'mu_propagated_isME11':[],'mu_propagated_isGEM':[],'STA_Normchi2':[],'nME1Hits':[],'nME2Hits':[],'nME3Hits':[],'nME4Hits':[]})
-            prop_glb_r = evt.mu_propagatedGlb_r[PropHit_index]
-            prop_loc_x = evt.mu_propagatedLoc_x[PropHit_index]
+            prop_glb_r = evt.mu_propagatedSegGlb_r[PropHit_index]
+            prop_loc_x = evt.mu_propagatedSegLoc_x[PropHit_index]
 
             if PropHitChamberID in VFATOFFDict:
                 if propHit2VFAT(prop_glb_r,prop_loc_x,etaP,region,chamber) in VFATOFFDict[PropHitChamberID]:
@@ -440,39 +428,39 @@ for chain_index,evt in enumerate(chain):
 
             
             PropHit_Dict[PropHitChamberID]['loc_x'].append(prop_loc_x)
-            PropHit_Dict[PropHitChamberID]['loc_y'].append(evt.mu_propagatedLoc_y[PropHit_index])
-            PropHit_Dict[PropHitChamberID]['glb_x'].append(evt.mu_propagatedGlb_x[PropHit_index])
-            PropHit_Dict[PropHitChamberID]['glb_y'].append(evt.mu_propagatedGlb_y[PropHit_index])
-            PropHit_Dict[PropHitChamberID]['glb_z'].append(evt.mu_propagatedGlb_z[PropHit_index])
+            PropHit_Dict[PropHitChamberID]['loc_y'].append(evt.mu_propagatedSegLoc_y[PropHit_index])
+            PropHit_Dict[PropHitChamberID]['glb_x'].append(evt.mu_propagatedSegGlb_x[PropHit_index])
+            PropHit_Dict[PropHitChamberID]['glb_y'].append(evt.mu_propagatedSegGlb_y[PropHit_index])
+            PropHit_Dict[PropHitChamberID]['glb_z'].append(evt.mu_propagatedSegGlb_z[PropHit_index])
             PropHit_Dict[PropHitChamberID]['glb_r'].append(prop_glb_r)
-            PropHit_Dict[PropHitChamberID]['glb_phi'].append(evt.mu_propagatedGlb_phi[PropHit_index])
-            PropHit_Dict[PropHitChamberID]['err_glb_r'].append(evt.mu_propagatedGlb_errR[PropHit_index])
-            PropHit_Dict[PropHitChamberID]['err_glb_phi'].append(evt.mu_propagatedGlb_errPhi[PropHit_index])
-            PropHit_Dict[PropHitChamberID]['Loc_dirX'].append(evt.mu_propagatedLoc_dirX[PropHit_index])
-            PropHit_Dict[PropHitChamberID]['Loc_dirY'].append(evt.mu_propagatedLoc_dirY[PropHit_index])
-            PropHit_Dict[PropHitChamberID]['Loc_dirZ'].append(evt.mu_propagatedLoc_dirZ[PropHit_index])
-            PropHit_Dict[PropHitChamberID]['pt'].append(evt.mu_propagated_pt[PropHit_index])
+            PropHit_Dict[PropHitChamberID]['glb_phi'].append(evt.mu_propagatedSegGlb_phi[PropHit_index])
+            PropHit_Dict[PropHitChamberID]['err_glb_r'].append(evt.mu_propagatedSegGlb_errR[PropHit_index])
+            PropHit_Dict[PropHitChamberID]['err_glb_phi'].append(evt.mu_propagatedSegGlb_errPhi[PropHit_index])
+            PropHit_Dict[PropHitChamberID]['Loc_dirX'].append(evt.mu_propagatedSegLoc_dirX[PropHit_index])
+            PropHit_Dict[PropHitChamberID]['Loc_dirY'].append(evt.mu_propagatedSegLoc_dirY[PropHit_index])
+            PropHit_Dict[PropHitChamberID]['Loc_dirZ'].append(evt.mu_propagatedSegLoc_dirZ[PropHit_index])
+            PropHit_Dict[PropHitChamberID]['pt'].append(evt.mu_propagatedSeg_pt[PropHit_index])
             PropHit_Dict[PropHitChamberID]['etaP'].append(etaP)
-            PropHit_Dict[PropHitChamberID]['mu_propagated_isME11'].append(evt.mu_propagated_isME11[PropHit_index])
-            PropHit_Dict[PropHitChamberID]['mu_propagated_isGEM'].append(evt.mu_propagated_isGEM[PropHit_index])
-            PropHit_Dict[PropHitChamberID]['STA_Normchi2'].append(evt.mu_propagated_TrackNormChi2[PropHit_index])            
-            PropHit_Dict[PropHitChamberID]['nME1Hits'].append(evt.mu_propagated_nME1hits[PropHit_index])
-            PropHit_Dict[PropHitChamberID]['nME2Hits'].append(evt.mu_propagated_nME2hits[PropHit_index])
-            PropHit_Dict[PropHitChamberID]['nME3Hits'].append(evt.mu_propagated_nME3hits[PropHit_index])
-            PropHit_Dict[PropHitChamberID]['nME4Hits'].append(evt.mu_propagated_nME4hits[PropHit_index])
+            PropHit_Dict[PropHitChamberID]['mu_propagated_isME11'].append(propHitFromME11)
+            PropHit_Dict[PropHitChamberID]['mu_propagated_isGEM'].append(True)
+            PropHit_Dict[PropHitChamberID]['STA_Normchi2'].append(1000)
+            PropHit_Dict[PropHitChamberID]['nME1Hits'].append(1000)
+            PropHit_Dict[PropHitChamberID]['nME2Hits'].append(1000)
+            PropHit_Dict[PropHitChamberID]['nME3Hits'].append(1000)
+            PropHit_Dict[PropHitChamberID]['nME4Hits'].append(1000)            
 
-            THSanityChecks['Occupancy']['BeforeMatching']['Prop'].Fill(evt.mu_propagatedGlb_x[PropHit_index],evt.mu_propagatedGlb_y[PropHit_index])
+            THSanityChecks['Occupancy']['BeforeMatching']['Prop'].Fill(evt.mu_propagatedSegGlb_x[PropHit_index],evt.mu_propagatedSegGlb_y[PropHit_index])
             THSanityChecks['Occupancy']['BeforeMatching'][endcapKey]['PropHits'].Fill(chamber,etaP)
-            THSanityChecks['etaP_vs_pt'].Fill(PropHit_Dict[PropHitChamberID]['etaP'][-1]-1,10*pt_index(evt.mu_propagated_pt[PropHit_index]))
-            THSanityChecks['STA_Normchi2'].Fill(evt.mu_propagated_TrackNormChi2[PropHit_index])
+            THSanityChecks['etaP_vs_pt'].Fill(PropHit_Dict[PropHitChamberID]['etaP'][-1]-1,10*pt_index(evt.mu_propagatedSeg_pt[PropHit_index]))
+            THSanityChecks['STA_Normchi2'].Fill(1)
 
 
             if chamber % 2 == 0:
-                THSanityChecks['Occupancy']['BeforeMatching']['PropLocalLong'].Fill(evt.mu_propagatedLoc_x[PropHit_index],evt.mu_propagatedLoc_y[PropHit_index])
-                THSanityChecks['PropHit_DirLoc_xOnGE11']['BeforeMatching']['Long']['eta'+str(etaP)].Fill(evt.mu_propagatedLoc_dirX[PropHit_index])
+                THSanityChecks['Occupancy']['BeforeMatching']['PropLocalLong'].Fill(evt.mu_propagatedSegLoc_x[PropHit_index],evt.mu_propagatedSegLoc_y[PropHit_index])
+                THSanityChecks['PropHit_DirLoc_xOnGE11']['BeforeMatching']['Long']['eta'+str(etaP)].Fill(evt.mu_propagatedSegLoc_dirX[PropHit_index])
             if chamber % 2 == 1:
-                THSanityChecks['Occupancy']['BeforeMatching']['PropLocalShort'].Fill(evt.mu_propagatedLoc_x[PropHit_index],evt.mu_propagatedLoc_y[PropHit_index])
-                THSanityChecks['PropHit_DirLoc_xOnGE11']['BeforeMatching']['Short']['eta'+str(etaP)].Fill(evt.mu_propagatedLoc_dirX[PropHit_index])
+                THSanityChecks['Occupancy']['BeforeMatching']['PropLocalShort'].Fill(evt.mu_propagatedSegLoc_x[PropHit_index],evt.mu_propagatedSegLoc_y[PropHit_index])
+                THSanityChecks['PropHit_DirLoc_xOnGE11']['BeforeMatching']['Short']['eta'+str(etaP)].Fill(evt.mu_propagatedSegLoc_dirX[PropHit_index])
 
     ML1_N_MatchedGEMRecoHits = 0
     ML2_N_MatchedGEMRecoHits = 0
@@ -559,6 +547,7 @@ for chain_index,evt in enumerate(chain):
 
         ## Filling STA properties in histos
         for k in range(nGoodPropagation):
+            if current_chamber_ID in chamberForEventDisplay: store4evtDspl(outputname,RunNumber,LumiSection,EventNumber)
             THSanityChecks['PropagationError']['glb_phi_error']['all'].Fill(PropHitonEta['err_glb_phi'][k])
             THSanityChecks['PropagationError']['glb_r_error']['all'].Fill(PropHitonEta['err_glb_r'][k])
             THSanityChecks['nME1Hits'].Fill(PropHitonEta['nME1Hits'][k])
@@ -600,7 +589,6 @@ for chain_index,evt in enumerate(chain):
 
 
         if etaPartitionID not in RecHit_Dict:
-            # if current_chamber_ID in chamberForEventDisplay: store4evtDspl(outputname,RunNumber,LumiSection,EventNumber)
             # if current_chamber_ID in chamberForEventDisplay: 
             #     print "event",EventNumber
             #     print "\t\tNothing to match on ", eta,"\t Match looked for phi = ",PropHitonEta['glb_phi']
@@ -615,7 +603,6 @@ for chain_index,evt in enumerate(chain):
             RecHitonEta = RecHit_Dict[etaPartitionID]
     
         THSanityChecks['NHits']['PerEVT_PerEtaPartitionID']['Reco'].Fill(len(RecHitonEta['glb_phi']))
-
 
         ## Seek for 1-best match between rec and prop based on Matching Var and Cutoff
         for matchingVar in matching_variables:
@@ -683,17 +670,13 @@ for chain_index,evt in enumerate(chain):
                 angle_index = int( np.sqrt(PropHitonEta['Loc_dirX'][prop_hit_index]**2 + PropHitonEta['Loc_dirY'][prop_hit_index]**2) * 20)
                 EfficiencyDictDirection[matchingVar][etaPartitionID][angle_index]['num'] += 1
 
-
+                TH1Fresidual_collector[matchingVar][endcapTag][current_chamber_ID]["All"]["Residual"].Fill(glb_rdphi_residual)
+                TH1Fresidual_collector[matchingVar][endcapTag][current_chamber_ID][eta]["Residual"].Fill(glb_rdphi_residual)
                 if matchingVar == "glb_rdphi":
                     TH1FpropError_collector["MatchedHits"][endcapTag][current_chamber_ID]["All"]["ErrPhi"].Fill(propagation_error_phi)
                     TH1FpropError_collector["MatchedHits"][endcapTag][current_chamber_ID][eta]["ErrPhi"].Fill(propagation_error_phi)
                     TH1FpropError_collector["MatchedHits"][endcapTag][current_chamber_ID]["All"]["ErrR"].Fill(propagation_error_r)
                     TH1FpropError_collector["MatchedHits"][endcapTag][current_chamber_ID][eta]["ErrR"].Fill(propagation_error_r)
-                    TH1Fresidual_collector[matchingVar][endcapTag][current_chamber_ID]["All"]["Residual"].Fill(glb_rdphi_residual)
-                    TH1Fresidual_collector[matchingVar][endcapTag][current_chamber_ID][eta]["Residual"].Fill(glb_rdphi_residual)
-                else:
-                    TH1Fresidual_collector[matchingVar][endcapTag][current_chamber_ID]["All"]["Residual"].Fill(glb_phi_residual)
-                    TH1Fresidual_collector[matchingVar][endcapTag][current_chamber_ID][eta]["Residual"].Fill(glb_phi_residual)
 
                 binx = int(round((PropHitonEta['loc_x'][prop_hit_index]-TH2min)*(TH2nbins-1)/(-2*TH2min)))+1
                 biny = int(round((PropHitonEta['loc_y'][prop_hit_index]-TH2min)*(TH2nbins-1)/(-2*TH2min)))+1
@@ -744,7 +727,7 @@ for chain_index,evt in enumerate(chain):
                         layer2pt = PropHitonEta['pt'][prop_hit_index]
                     
             else:
-                # if current_chamber_ID in chamberForEventDisplay: store4evtDspl(outputname,RunNumber,LumiSection,EventNumber)
+                #if current_chamber_ID in chamberForEventDisplay: store4evtDspl(outputname,RunNumber,LumiSection,EventNumber)
                 # print "Matching failed for ", etaPartitionID
                 # print PropHit_Dict[etaPartitionID]['glb_phi'], RecHit_Dict[etaPartitionID]['glb_phi']
                 # raw_input()

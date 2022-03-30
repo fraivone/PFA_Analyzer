@@ -16,15 +16,19 @@ def generateSubFile(outputName):
         sout.write("error                   = ./Logs/error.$(ClusterId)_Run"+str(outputName)+".err"+"\n")
         sout.write("log                     = ./Logs/log.$(ClusterId)_Run"+str(outputName)+".log"+"\n")
         sout.write("+JobFlavour             = \""+job_flavour+"\" "+"\n")
+        sout.write("notify_user             = francesco.ivone@cern.ch\n")
+        sout.write("notification            = always\n")
         sout.write("queue"+"\n")
     return SubfileName
 
-def generateJobShell(run_number,outputName,pc,rdpc,minPt,max_NormChi2,minME1Hit,minME2Hit,minME3Hit,minME4Hit,maxErrOnPropR,maxErrOnPropPhi,maskChVFAT):
+def generateJobShell(run_number,outputName,pc,rdpc,minPt,max_NormChi2,minME1Hit,minME2Hit,minME3Hit,minME4Hit,maxErrOnPropR,maxErrOnPropPhi,maskChVFAT,doubleLayerEfficiency):
     run_number_int = int(regularExpression.sub("[^0-9]", "", run_number))
     main_command = "python PFA_Analyzer.py --dataset "+str(run_number)+" -pc " +str(pc) + " -rdpc "+str(rdpc)+" --outputname "+outputName+" --minPt "+str(minPt) +   " --chi2cut "+str(max_NormChi2) +" --minME1 "+str(minME1Hit) + " --minME2 "+str(minME2Hit) +  " --minME3 "+str(minME3Hit) + " --minME4 "+str(minME4Hit) + " --maxErrPropR "+str(maxErrOnPropR)+" --maxErrPropPhi "+str(maxErrOnPropPhi)
         
     if maskChVFAT == True: 
         main_command = main_command + " --chamberOFF /afs/cern.ch/user/f/fivone/Test/PFA_MaskGenerator/ChamberOFF_Run_"+str(run_number_int)+".json --VFATOFF ./ExcludeMe/ListOfDeadVFAT_run"+str(run_number_int)+".txt"
+    if doubleLayerEfficiency == True:
+        main_command = main_command + " --DLE"
         
     main_command = main_command + " \n"
 
@@ -47,7 +51,7 @@ def generateJobShell(run_number,outputName,pc,rdpc,minPt,max_NormChi2,minME1Hit,
 if __name__=='__main__':
     parser = argparse.ArgumentParser(
         description='''Scripts runs PFA_Analyzer.py for many different input runs''',
-        epilog="""Typical exectuion (from this folder)\n\t  python runJobs.py --runList 20Jan2022 --outputNames MC_Collision_Default --minME1 4 --minME2 0 --minME3 0 --minME4 0 --maskChFAT 0 --minPt 0 -rdpc 1 -pc 0.005 --chi2cut 999999""",
+        epilog="""Typical exectuion (from this folder)\n\t  python runJobs.py --runList 20Jan2022 --outputNames MC_Collision_Default --minME1 4 --minME2 0 --minME3 0 --minME4 0 --maskChVFAT --minPt 0 -rdpc 1 -pc 0.005 --chi2cut 999999""",
         formatter_class=RawTextHelpFormatter
         )
 
@@ -65,6 +69,7 @@ if __name__=='__main__':
     parser.add_argument('--minME4', type=int, help="Min number of ME4 hits, 0 by default",required=False)
     parser.add_argument('--maxErrPropR', type=float , help="max error on propagated R in order to accept the muon",required=False)
     parser.add_argument('--maxErrPropPhi', type=float , help="max error on propagated phi in order to accept the muon",required=False)
+    parser.add_argument('--DLE', default=False, action='store_true',help="Swtiches on the Double Layer Efficiency (DLE) analisys. False by default",required=False)
 
     parser.set_defaults(minPt=0)
     parser.set_defaults(minME1=0)
@@ -82,6 +87,7 @@ if __name__=='__main__':
     rdpc = args.rdphi_cut
     outputs = args.outputNames
     maskChVFAT = args.maskChVFAT
+    DLE = args.DLE
     minPt = args.minPt
     maxSTA_NormChi2 = args.chi2cut
     minME1Hit = args.minME1
@@ -90,6 +96,7 @@ if __name__=='__main__':
     minME4Hit = args.minME4
     maxErrOnPropR = args.maxErrPropR
     maxErrOnPropPhi = args.maxErrPropPhi
+
 
     if len(inputs) != len(outputs):
         print "Parsed runList and outputNames are different in number...\nExiting .."
@@ -100,6 +107,6 @@ if __name__=='__main__':
         name = outputs[index]
         
         SubfileName = generateSubFile(name)
-        generateJobShell(run,name,pc,rdpc,minPt,maxSTA_NormChi2,minME1Hit,minME2Hit,minME3Hit,minME4Hit,maxErrOnPropR,maxErrOnPropPhi,maskChVFAT)
+        generateJobShell(run,name,pc,rdpc,minPt,maxSTA_NormChi2,minME1Hit,minME2Hit,minME3Hit,minME4Hit,maxErrOnPropR,maxErrOnPropPhi,maskChVFAT,DLE)
         os.chdir("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/CondorSub/JobFiles/")
         os.system("condor_submit "+SubfileName)

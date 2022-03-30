@@ -37,10 +37,10 @@ ROOT.gStyle.SetPalette(ROOT.kRainBow)
 
 ## ROOT Objects
 TH1F_Container = [ i for i in range(len(inputs))]
-Comulative_Container = [ i for i in range(len(inputs))]
+Cumulative_Container = [ i for i in range(len(inputs))]
 hs = ROOT.THStack("hs","EfficiencyDistribution")
-hComulative = ROOT.THStack("hComulative","ComulativeDistribution")
-hComulative.SetMaximum(110)
+hCumulative = ROOT.THStack("hCumulative","CumulativeDistribution")
+hCumulative.SetMaximum(150)
 
 
 
@@ -71,30 +71,31 @@ for index_input_file,file_path in enumerate(inputs):
     TH1F_Container[index_input_file] = generateEfficiencyDistribution(dictionary)
     
     fa1 = ROOT.TF1("f11","1",0,1) ## dumb function to add a constant to TH1F
-    Comulative_Container[index_input_file] = -1*TH1F_Container[index_input_file].GetCumulative()
-    Comulative_Container[index_input_file].Add(fa1,-Comulative_Container[index_input_file].GetMinimum())
-    Comulative_Container[index_input_file].Scale(100./Comulative_Container[index_input_file].GetMaximum())
+    Cumulative_Container[index_input_file] = -1*TH1F_Container[index_input_file].GetCumulative()
+    Cumulative_Container[index_input_file].Add(fa1,-Cumulative_Container[index_input_file].GetMinimum())
+    # Cumulative_Container[index_input_file].Scale(100./Cumulative_Container[index_input_file].GetMaximum())
 
     TH1F_Container[index_input_file].SetFillColorAlpha(color[index_input_file],.6)
     TH1F_Container[index_input_file].SetLineColor(color[index_input_file])
-    Comulative_Container[index_input_file].SetLineColor(color[index_input_file])
-    Comulative_Container[index_input_file].SetLineWidth(3)
+    Cumulative_Container[index_input_file].SetLineColor(color[index_input_file])
+    Cumulative_Container[index_input_file].SetLineWidth(4)
 
     TH1F_Container[index_input_file].SetName(label_list[index_input_file])
     TH1F_Container[index_input_file].SetTitle(label_list[index_input_file])
-    Comulative_Container[index_input_file].SetName(label_list[index_input_file])
-    Comulative_Container[index_input_file].SetTitle(label_list[index_input_file])
+    Cumulative_Container[index_input_file].SetName(label_list[index_input_file])
+    Cumulative_Container[index_input_file].SetTitle(label_list[index_input_file])
 
     hs.Add(TH1F_Container[index_input_file])
-    hComulative.Add(Comulative_Container[index_input_file])
+    hCumulative.Add(Cumulative_Container[index_input_file])
+    print file_path,"\t85%\t",Cumulative_Container[index_input_file].GetBinContent(86),TH1F_Container[index_input_file].GetEntries()
 
 
 
 
-for h in [hs,hComulative]:
+for h in [hs,hCumulative]:
     h.Draw("nostack")
     h.GetXaxis().SetTitle("Chamber MIP Efficiency")
-    if h.GetName() == "hComulative": h.GetYaxis().SetTitle("%Ch w/ efficiency greater than X")
+    if h.GetName() == "hCumulative": h.GetYaxis().SetTitle("%Ch w/ efficiency greater than X")
     c2.BuildLegend()
     c2.Modified()
     c2.Update()
