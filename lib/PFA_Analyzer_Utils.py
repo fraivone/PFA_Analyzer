@@ -1,6 +1,9 @@
 from numpy.core.numeric import NaN
+import os
 import ROOT
 import numpy
+import subprocess
+import re as regularExpression
 import pandas as pd
 from ROOT_Utils import *
 from EtaPartitionBoundaries import *
@@ -128,7 +131,7 @@ def importOFFVFAT(list_of_file_path):
 
             ## If the key doesn't exsist create it, then fill the list
             off_VFAT.setdefault(etaPartitionID,[])
-            if maskReason == 1:
+            if maskReason == 1:  ## only mask empty VFATs
                 off_VFAT[etaPartitionID].append(VFAT)
 
     return off_VFAT
@@ -311,7 +314,10 @@ def generate1DResidualContainer(matching_variables,nbins,ResidualCutOff):
     output_dict = {}
     for mv in matching_variables:
         output_dict[mv] = {}
-        minB = -ResidualCutOff["glb_rdphi"]*2
+        if mv == "glb_rdphi":
+            minB = -ResidualCutOff["glb_rdphi"]
+        else:
+            minB = -ResidualCutOff["glb_phi"]
 
         for (re,la) in [(1,1),(1,2),(-1,1),(-1,2)]:
             endcap_key = EndcapLayer2label(re,la)
@@ -437,11 +443,11 @@ def generateClopperPeasrsonInterval(num,den):
     confidenceLevel = 0.68
     alpha = 1 - confidenceLevel
     
-    lowerLimit = ROOT.Math.beta_quantile(alpha/2,num,den-num + 1)
+    lowerLimit = round(ROOT.Math.beta_quantile(alpha/2,num,den-num + 1),4)
     if num==den:
         upperLimit=1
     else:
-        upperLimit = ROOT.Math.beta_quantile(1-alpha/2,num + 1,den-num)
+        upperLimit = round(ROOT.Math.beta_quantile(1-alpha/2,num + 1,den-num),4)
     return lowerLimit,upperLimit
 
 def generateEfficiencyPlotbyEta(sourceDict,input_region=1,input_layer=1):
@@ -516,8 +522,8 @@ def generate1DEfficiencyPlotbyVFAT(EfficiencyDictVFAT,chamber_ID):
     TH1Den = ROOT.TH1F(title, title,24,-0.5,23.5)
 
     for VFATN in range(24):
-        TH1Num.SetBinContent(VFATN,EfficiencyDictVFAT[endcapTag][chamber_ID][VFATN]['num'])
-        TH1Den.SetBinContent(VFATN,EfficiencyDictVFAT[endcapTag][chamber_ID][VFATN]['den'])
+        TH1Num.SetBinContent(VFATN+1,EfficiencyDictVFAT[endcapTag][chamber_ID][VFATN]['num'])
+        TH1Den.SetBinContent(VFATN+1,EfficiencyDictVFAT[endcapTag][chamber_ID][VFATN]['den'])
     
     Summary.Divide(TH1Num,TH1Den,"B")
     Summary.GetXaxis().SetLimits(-0.5,23.5)
@@ -665,7 +671,6 @@ def generate2DEfficiencyPlotbyVFAT(EfficiencyDictVFAT,efficiency_target):
                     efficiency = 0.01 ## Avoid empty label when printing it with text
                 else:
                     efficiency = round(float(VFAT_num)/VFAT_den,2)
-
 
                 selected_bin = h2p.AddBin(4,rotated_and_translated_x,rotated_and_translated_y)
                 h2p.SetBinContent(selected_bin,efficiency)
@@ -1041,39 +1046,81 @@ def store4evtDspl(name,run,lumi,evt):
 def printEfficiencyFromCSV(path):
     file_path = path + "/MatchingSummary_glb_rdphi.csv"
     print file_path,"\n"
-    print "Label","\t","Analyzed Chambers","\t","AVG pt","\t","Matched","\t","Propagated","\t","Eff. 68%CL"
+    print '{:<20}{:<20}{:<20}{:<20}{:<20}'.format("Region","AnalyzedChambers","Matched","Propagated","Eff. 68%CL")
 
-    df = pd.read_csv(file_path, sep=',')
+
+    all_prop=0
+    all_mat=0
+    all_chamb=0
+    all_pt=0
+    for region in [1, -1]:
+        df = pd.read_csv(file_path, sep=',')
+        mask = df['region'] == region
+        df = df[mask]
     
-    Matched = df["matchedRecHit"].sum()
-    Propagated = df["propHit"].sum()
-    if "AVG_pt" in df.columns: 
-        AVGpt  =  round(df["AVG_pt"].mean(),4)
-    else:
-        AVGpt = 0
-    analyzed_Chambers = float(len(df))/8
-    
-    for eta in range(1,9):
-        df_temp = df[ df["etaPartition"] == eta ]
-        etaMatched = df_temp["matchedRecHit"].sum()
-        etaProp = df_temp["propHit"].sum()
+        Matched = df["matchedRecHit"].sum()
+        all_mat+=Matched
+
+        Propagated = df["propHit"].sum()
+        all_prop+=Propagated
+
         if "AVG_pt" in df.columns: 
-            AVGpteta  = round(df_temp["AVG_pt"].mean(),4)
+            AVGpt  =  round(df["AVG_pt"].mean(),4)
         else:
-            AVGpteta  = 0
+            AVGpt = 0
+        all_pt+=AVGpt
+        analyzed_Chambers = float(len(df))/8
+        all_chamb+=analyzed_Chambers
+        print '{:<20}{:<20}{:<20}{:<20}{:<20}'.format(region,analyzed_Chambers,Matched,Propagated,generateClopperPeasrsonInterval(Matched,Propagated))
 
-
-        # print "Eta",eta,"\t",AVGpteta,"\t",etaMatched,"\t",etaProp,"\t",generateClopperPeasrsonInterval(etaMatched,etaProp)
-    print "GE11","\t",analyzed_Chambers,"\t", AVGpt,"\t",Matched,"\t",Propagated,"\t",generateClopperPeasrsonInterval(Matched,Propagated)
+    print '{:<20}{:<20}{:<20}{:<20}{:<20}'.format("all",all_chamb,all_mat,all_prop,generateClopperPeasrsonInterval(all_mat,all_prop))
     print "##############\n"  
 
-if __name__ == '__main__':
-    printEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/CSV/MergedRuns_Prompt_700uA_100HZ_Trim_chi2_20/")
-    printEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/CSV/MergedRuns_Prompt_700uA_100HZ_Trim_chi2_15/")
-    printEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/CSV/MergedRuns_Prompt_700uA_100HZ_Trim_chi2_10/")
-    printEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/CSV/MergedRuns_Prompt_700uA_100HZ_Trim_chi2_8/")
-    printEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/CSV/MergedRuns_Prompt_700uA_100HZ_Trim_chi2_6/")
-    printEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/CSV/MergedRuns_Prompt_700uA_100HZ_Trim_chi2_4/")
-    printEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/CSV/MergedRuns_Prompt_700uA_100HZ_Trim_chi2_2/")
+def CreatEOSFolder(abs_path):
+    subprocess.call(["mkdir", "-p", abs_path])
+    subprocess.call(["cp", "/eos/user/f/fivone/www/index.php",abs_path+"/index.php"])
+    run_number = GetRunNumber(abs_path)
+    if run_number != "000000":
+        
+        command = "source /afs/cern.ch/user/f/fivone/Test/FetchOMS/venv/bin/activate; python3 /afs/cern.ch/user/f/fivone/Test/FetchOMS/RecordedLumi.py  --RunList "+run_number
+        p = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True,stderr=subprocess.PIPE)
+        (output, err) = p.communicate()  
+        #Wait until finished...
+        p_status = p.wait()
+        labels = output.splitlines()[0].split(";")
+        values = output.splitlines()[1].split(";")
 
-    pass
+        with open (abs_path+"/runInfo.txt",'w+') as f:
+            for index in range(len(labels)):
+                line_to_write = '{:<20}  {:<20}'.format(labels[index].replace(" ",""), values[index].replace(" ",""))+"\n"
+                f.write(line_to_write)
+
+def Convert2png(file_path):
+    subprocess.call(["convert","-density", "300", "-trim", file_path, "-quality", "100", file_path.replace("pdf","png")])
+def GetRunNumber(input_string):
+    run_number = "000000"
+    ## the run number has 6 digis, followed by _
+    values = input_string.split("_")
+    for v in values:
+        onlydigis = regularExpression.sub("[^0-9]", "", v)
+        if len(onlydigis) == 6 and int(onlydigis) > 346000:
+            run_number=onlydigis
+    
+    return run_number
+
+if __name__ == '__main__':
+    print("MergedRuns_700uA_10kHz_Trim")
+    printEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/CSV/MergedRuns_700uA_10kHz_Trim/")
+    print()
+    print("Merged_NovCRUZET_700uA_10kHz")
+    printEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/CSV/Merged_NovCRUZET_700uA_10kHz/")
+    print()
+    print("MergeCRAFT_700uA_STDGasFlow")
+    printEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/CSV/MergeCRAFT_700uA_STDGasFlow/")
+    print()    
+    print("MergeCRAFT_700uA_LoweredGasFlow")
+    printEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/CSV/MergeCRAFT_700uA_LoweredGasFlow/")
+    print()    
+
+
+pass
