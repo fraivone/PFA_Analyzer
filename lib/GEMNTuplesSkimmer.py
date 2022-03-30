@@ -42,16 +42,13 @@ OutF = ROOT.TFile("/eos/user/f/fivone/GEMNTuples/"+args.dataset[0]+".root","RECR
 ## Selecting useful branches, skim the others
 chain.SetBranchStatus("*", 0)
 chain.SetBranchStatus("event_eventNumber", 1)
-chain.SetBranchStatus("mu_propagatedGlb_x", 1)
-chain.SetBranchStatus("mu_propagatedGlb_y", 1)
 chain.SetBranchStatus("mu_propagated_isME11", 1)
-chain.SetBranchStatus("mu_propagated_layer", 1)
-chain.SetBranchStatus("mu_propagated_chamber", 1)
-chain.SetBranchStatus("mu_propagated_region", 1)
-
-
-
-
+chain.SetBranchStatus("mu_propagated_nME1hits",1)
+chain.SetBranchStatus("mu_propagatedSeg_chamber",1)
+chain.SetBranchStatus("mu_propagatedSeg_region",1)
+chain.SetBranchStatus("mu_propagatedSeg_layer",1)
+chain.SetBranchStatus("mu_propagatedSegGlb_x",1)
+chain.SetBranchStatus("mu_propagatedSegGlb_y",1)
 
 
 OutF.cd()

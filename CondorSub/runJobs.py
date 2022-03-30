@@ -57,9 +57,9 @@ if __name__=='__main__':
 
 
     parser.add_argument('--runList', type=str , help="List of the runs to be analyzed (make sure they're  ntuplized)",required=True,nargs='*')
-    parser.add_argument('-pc','--phi_cut', type=float,help="Maximum allowed dphi between RecoHit and PropHit to be counted as matched hit",required=True)
-    parser.add_argument('-rdpc','--rdphi_cut', type=float,help="Maximum allowed rdphi between RecoHit and PropHit to be counted as matched hit",required=True)
-    parser.add_argument('--outputNames', type=str , help="List of output names",required=True,nargs='*')
+    parser.add_argument('-pc','--phi_cut', type=float,help="Maximum allowed dphi between RecoHit and PropHit to be counted as matched hit",required=False)
+    parser.add_argument('-rdpc','--rdphi_cut', type=float,help="Maximum allowed rdphi between RecoHit and PropHit to be counted as matched hit",required=False)
+    parser.add_argument('--outputNames', type=str , help="List of output names",required=False,nargs='*')
     parser.add_argument('--maskChVFAT' ,dest='maskChVFAT', help="Activate chamber/VFAT masking",action='store_true')
     parser.add_argument('--chi2cut', type=float,help="Maximum normalized chi2 for which accept propagated tracks",required=False)
     parser.add_argument('--minPt', type=float,help="Minimum pt for which accept propagated tracks, in GeV",required=False)
@@ -71,13 +71,15 @@ if __name__=='__main__':
     parser.add_argument('--maxErrPropPhi', type=float , help="max error on propagated phi in order to accept the muon",required=False)
     parser.add_argument('--DLE', default=False, action='store_true',help="Swtiches on the Double Layer Efficiency (DLE) analisys. False by default",required=False)
 
+    parser.set_defaults(phi_cut=0.02)
+    parser.set_defaults(rdphi_cut=4)
     parser.set_defaults(minPt=0)
     parser.set_defaults(minME1=0)
     parser.set_defaults(minME2=0)
     parser.set_defaults(minME3=0)
     parser.set_defaults(minME4=0)
     parser.set_defaults(maxErrPropR=1)
-    parser.set_defaults(maxErrPropPhi=0.01)
+    parser.set_defaults(maxErrPropPhi=0.005)
     parser.set_defaults(maskChVFAT=False)
     parser.set_defaults(chi2cut=9999999)
 
@@ -85,7 +87,8 @@ if __name__=='__main__':
     inputs = args.runList
     pc = args.phi_cut
     rdpc = args.rdphi_cut
-    outputs = args.outputNames
+    if args.outputNames != None: outputs = args.outputNames
+    else: outputs = inputs
     maskChVFAT = args.maskChVFAT
     DLE = args.DLE
     minPt = args.minPt
