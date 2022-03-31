@@ -23,8 +23,6 @@ parser.add_argument('--verbose', default=False, action='store_true',help="Verbos
 parser.add_argument('--batch', default=False, action='store_true',help="ROOT in batch mode",required=False)
 
 
-thr_folder_old = "/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/THR_Data/THR_ARM_DAC/SBit100_Trimming/"
-
 args = parser.parse_args()
 enable_THR = args.THR
 inputs = ["./Output/PFA_Analyzer_Output/CSV/"+i+"/MatchingSummary_glb_rdphi.csv" for i in args.inputs]

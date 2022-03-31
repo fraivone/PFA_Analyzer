@@ -2,12 +2,12 @@ import sys
 import os
 import argparse
 from argparse import RawTextHelpFormatter
-import re as regularExpression
-
+from lib.PFA_Analyzer_Utils import *
 
 def generateSubFile(outputName):
+    base_dir = os.path.expandvars("$DOC2_PFA")
     job_flavour = "tomorrow"
-    SubfileName = "/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/CondorSub/JobFiles/SubmitFile_"+str(outputName)+".sub"
+    SubfileName = base_dir +"/Analyzer/CondorSub/JobFiles/SubmitFile_"+str(outputName)+".sub"
     with open(SubfileName, 'w') as sout:
         sout.write("executable              = job_Run_"+str(outputName)+".sh"+"\n")
         sout.write("getenv                  = true"+"\n")
@@ -22,25 +22,26 @@ def generateSubFile(outputName):
     return SubfileName
 
 def generateJobShell(run_number,outputName,pc,rdpc,minPt,max_NormChi2,minME1Hit,minME2Hit,minME3Hit,minME4Hit,maxErrOnPropR,maxErrOnPropPhi,maskChVFAT,doubleLayerEfficiency):
-    run_number_int = int(regularExpression.sub("[^0-9]", "", run_number))
+    base_dir = os.path.expandvars("$DOC2_PFA")
+    run_number_int = int(GetRunNumber(run_number))
     main_command = "python PFA_Analyzer.py --dataset "+str(run_number)+" -pc " +str(pc) + " -rdpc "+str(rdpc)+" --outputname "+outputName+" --minPt "+str(minPt) +   " --chi2cut "+str(max_NormChi2) +" --minME1 "+str(minME1Hit) + " --minME2 "+str(minME2Hit) +  " --minME3 "+str(minME3Hit) + " --minME4 "+str(minME4Hit) + " --maxErrPropR "+str(maxErrOnPropR)+" --maxErrPropPhi "+str(maxErrOnPropPhi)
         
     if maskChVFAT == True: 
-        main_command = main_command + " --chamberOFF /afs/cern.ch/user/f/fivone/Test/PFA_MaskGenerator/ChamberOFF_Run_"+str(run_number_int)+".json --VFATOFF ./ExcludeMe/ListOfDeadVFAT_run"+str(run_number_int)+".txt"
+        main_command = main_command + " --chamberOFF "+base_dir+"/Chamber_MaskMaker/ChamberOFF_Run_"+str(run_number_int)+".json --VFATOFF ./ExcludeMe/ListOfDeadVFAT_run"+str(run_number_int)+".txt"
     if doubleLayerEfficiency == True:
         main_command = main_command + " --DLE"
         
     main_command = main_command + " \n"
 
 
-    with open("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/CondorSub/JobFiles/job_Run_"+str(outputName)+".sh", 'w') as fout:
+    with open(base_dir+"/Analyzer/CondorSub/JobFiles/job_Run_"+str(outputName)+".sh", 'w') as fout:
         ####### Write the instruction for each job
         fout.write("#!/bin/sh\n")
         fout.write("echo\n")
         fout.write("echo %s_Run"+str(run_number)+"\n")
         fout.write("echo\n")
         fout.write("echo 'START---------------'\n")
-        fout.write("cd /afs/cern.ch/user/f/fivone/Test/PFA_Analyzer"+"\n")
+        fout.write("cd "base_dir+"/Analyzer"+"\n")
         ## sourceing the right gcc version to compile the source code
         fout.write("source /cvmfs/sft.cern.ch/lcg/contrib/gcc/9.1.0/x86_64-centos7/setup.sh"+"\n")
         fout.write("source /cvmfs/sft.cern.ch/lcg/app/releases/ROOT/6.18.04/x86_64-centos7-gcc48-opt/bin/thisroot.sh"+"\n")
@@ -99,7 +100,7 @@ if __name__=='__main__':
     minME4Hit = args.minME4
     maxErrOnPropR = args.maxErrPropR
     maxErrOnPropPhi = args.maxErrPropPhi
-
+    base_dir = os.path.expandvars("$DOC2_PFA")
 
     if len(inputs) != len(outputs):
         print "Parsed runList and outputNames are different in number...\nExiting .."
@@ -111,5 +112,5 @@ if __name__=='__main__':
         
         SubfileName = generateSubFile(name)
         generateJobShell(run,name,pc,rdpc,minPt,maxSTA_NormChi2,minME1Hit,minME2Hit,minME3Hit,minME4Hit,maxErrOnPropR,maxErrOnPropPhi,maskChVFAT,DLE)
-        os.chdir("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/CondorSub/JobFiles/")
+        os.chdir(base_dir+"/Analyzer/CondorSub/JobFiles/")
         os.system("condor_submit "+SubfileName)

@@ -935,27 +935,6 @@ def pt_index(num):
     
     return index
 
-## returns a dict containing the strip pitch for a given ch,etaP
-def GetStripGeometry():
-    stripGeometryDict = {}
-    df = pd.read_csv("/afs/cern.ch/user/f/fivone/Documents/myLIB/GE11Geometry/GE11StripSpecs.csv")
-        
-    for ch in range(1,37):
-        stripGeometryDict[ch] = {}
-        for etaP in range(1,9):
-            if ch%2 == 0:
-                chID = "Long"
-            if ch%2 == 1:
-                chID = "Short"
-            df_temp = df.loc[df['Chamber'] == chID]
-            df_temp = df_temp.loc[df_temp['EtaP'] == etaP]
-            firstStripPosition = df_temp["Loc_x"].min()
-            lastStripPosition = df_temp["Loc_x"].max()
-            stripPitch = (lastStripPosition - firstStripPosition)/float(len(df_temp["Loc_x"]))
-            stripGeometryDict[ch].setdefault(etaP,{'stripPitch':stripPitch,'firstStrip':firstStripPosition,"lastStrip":lastStripPosition})
-
-    return stripGeometryDict
-
 
 def printSummary(sourceDict,matching_variables,ResidualCutOff,matching_variable_units,debug=False):
     for matching_variable in matching_variables:
@@ -1039,7 +1018,8 @@ def fillMatchingTreeArray(PropHitonEta,prop_hit_index,RecHitonEta,reco_hit_index
     return recHit_Matching,propHit_Matching
 
 def store4evtDspl(name,run,lumi,evt):
-    evtDspl_dir = "/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/EvtDspl/"
+    base_dir = os.path.expandvars("$DOC2_PFA")
+    evtDspl_dir = base_dir+"/Analyzer/Output/PFA_Analyzer_Output/EvtDspl/"
     with open(evtDspl_dir+name+".txt", 'a+') as f:
         f.write(str(run)+":"+str(lumi)+":"+str(evt)+"\n")
 
@@ -1078,22 +1058,8 @@ def printEfficiencyFromCSV(path):
 
 def CreatEOSFolder(abs_path):
     subprocess.call(["mkdir", "-p", abs_path])
-    subprocess.call(["cp", "/eos/user/f/fivone/www/index.php",abs_path+"/index.php"])
+    #subprocess.call(["cp", <which_path>,abs_path+"/index.php"])
     run_number = GetRunNumber(abs_path)
-    if run_number != "000000":
-        
-        command = "source /afs/cern.ch/user/f/fivone/Test/FetchOMS/venv/bin/activate; python3 /afs/cern.ch/user/f/fivone/Test/FetchOMS/RecordedLumi.py  --RunList "+run_number
-        p = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True,stderr=subprocess.PIPE)
-        (output, err) = p.communicate()  
-        #Wait until finished...
-        p_status = p.wait()
-        labels = output.splitlines()[0].split(";")
-        values = output.splitlines()[1].split(";")
-
-        with open (abs_path+"/runInfo.txt",'w+') as f:
-            for index in range(len(labels)):
-                line_to_write = '{:<20}  {:<20}'.format(labels[index].replace(" ",""), values[index].replace(" ",""))+"\n"
-                f.write(line_to_write)
 
 def Convert2png(file_path):
     subprocess.call(["convert","-density", "300", "-trim", file_path, "-quality", "100", file_path.replace("pdf","png")])
@@ -1109,18 +1075,4 @@ def GetRunNumber(input_string):
     return run_number
 
 if __name__ == '__main__':
-    print("MergedRuns_700uA_10kHz_Trim")
-    printEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/CSV/MergedRuns_700uA_10kHz_Trim/")
-    print()
-    print("Merged_NovCRUZET_700uA_10kHz")
-    printEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/CSV/Merged_NovCRUZET_700uA_10kHz/")
-    print()
-    print("MergeCRAFT_700uA_STDGasFlow")
-    printEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/CSV/MergeCRAFT_700uA_STDGasFlow/")
-    print()    
-    print("MergeCRAFT_700uA_LoweredGasFlow")
-    printEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/CSV/MergeCRAFT_700uA_LoweredGasFlow/")
-    print()    
-
-
-pass
+    pass
