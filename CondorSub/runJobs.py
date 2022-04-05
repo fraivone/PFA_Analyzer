@@ -52,7 +52,7 @@ def generateJobShell(run_number,outputName,pc,rdpc,minPt,max_NormChi2,minME1Hit,
 if __name__=='__main__':
     parser = argparse.ArgumentParser(
         description='''Scripts runs PFA_Analyzer.py for many different input runs''',
-        epilog="""Typical exectuion (from this folder)\n\t  python runJobs.py --runList 20Jan2022 --outputNames MC_Collision_Default --minME1 4 --minME2 0 --minME3 0 --minME4 0 --maskChVFAT --minPt 0 -rdpc 1 -pc 0.005 --chi2cut 999999""",
+        epilog="""Typical exectuion (from this folder)\n\t  python runJobs.py --runList 349527_Express 349528_Express --maskChVFAT""",
         formatter_class=RawTextHelpFormatter
         )
 
