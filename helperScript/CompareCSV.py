@@ -189,7 +189,7 @@ for index,key in enumerate(Multigraph_Dict.keys()):
     
     leg_list[key] = ROOT.TLegend(0.1,0.1,0.3,0.2+0.03*(len(inputs)-1 + items_in_the_legend))
     leg_list[key].SetBorderSize(2)
-    leg_list[key].SetFillStyle(0)
+    #leg_list[key].SetFillStyle(1)
     for j,file_path in enumerate(inputs):
         leg_list[key].AddEntry(TGraphError_Dict[key][j],TGraphError_Dict[key][j].GetName(),"PE")
 

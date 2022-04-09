@@ -26,7 +26,7 @@ def generateJobShell(run_number,outputName,pc,rdpc,minPt,max_NormChi2,minME1Hit,
     main_command = "python PFA_Analyzer.py --dataset "+str(run_number)+" -pc " +str(pc) + " -rdpc "+str(rdpc)+" --outputname "+outputName+" --minPt "+str(minPt) +   " --chi2cut "+str(max_NormChi2) +" --minME1 "+str(minME1Hit) + " --minME2 "+str(minME2Hit) +  " --minME3 "+str(minME3Hit) + " --minME4 "+str(minME4Hit) + " --maxErrPropR "+str(maxErrOnPropR)+" --maxErrPropPhi "+str(maxErrOnPropPhi)
         
     if maskChVFAT == True: 
-        main_command = main_command + " --chamberOFF /afs/cern.ch/user/f/fivone/Test/PFA_MaskGenerator/ChamberOFF_Run_"+str(run_number_int)+".json --VFATOFF ./ExcludeMe/ListOfDeadVFAT_run"+str(run_number_int)+".txt"
+        main_command = main_command + " --chamberOFF ./ExcludeMe/ChamberOFF_Run_"+str(run_number_int)+".json --VFATOFF ./ExcludeMe/ListOfDeadVFAT_run"+str(run_number_int)+".txt"
     if doubleLayerEfficiency == True:
         main_command = main_command + " --DLE"
         
