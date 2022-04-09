@@ -31,7 +31,7 @@ inputs_byDLE =  ["./Output/PFA_Analyzer_Output/CSV/"+i+"/MatchingSummary_glb_rdp
 exclusion_dict = args.exclusion
 output = args.output
 DLE = args.DLE
-run_list = [int(regularExpression.findall(r'\d+', i)[0]) for i in args.inputs]
+run_list = [GetRunNumber(i) for i in args.inputs]
 
 
 print "\n########\nRun(s) to be merged:\t\t\t",str(run_list)[1:-1]
@@ -99,8 +99,8 @@ for region in [-1,1]:
                 ## Loop over all runs/files
                 for file_index,df in enumerate(df_list):
                     if DLE: df_byDLE = df_list_byDLE[file_index]
-
-                    if chamberID in exclusion_dict.keys() and run_list[file_index] in exclusion_dict[chamberID]:
+                    if chamberID in exclusion_dict.keys() and int(run_list[file_index]) in exclusion_dict[chamberID]:
+                        print "ChamberID ",chamberID,"\t",args.inputs[file_index],"\tExclusion DICT ", exclusion_dict[chamberID]
                         continue
 
                     temp_df = df[ (df['chamberID']==chamberID) & (df['etaPartition']==eta)]
