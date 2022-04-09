@@ -1076,6 +1076,25 @@ def printEfficiencyFromCSV(path):
     print '{:<20}{:<20}{:<20}{:<20}{:<20}'.format("all",all_chamb,all_mat,all_prop,generateClopperPeasrsonInterval(all_mat,all_prop))
     print "##############\n"  
 
+
+def ChamberEfficiencyFromCSV(path,chamber):
+    file_path = path + "/MatchingSummary_glb_rdphi.csv"
+    prop=0
+    mat=0
+
+    df = pd.read_csv(file_path, sep=',')
+    mask = df['chamberID'] == chamber
+    df = df[mask]
+    if len(df)==0: return 0,0,0
+
+    else:
+        
+        mat = df["matchedRecHit"].sum()
+        prop = df["propHit"].sum()
+        if prop == 0:
+            return 0,0,0
+        return mat,prop,generateClopperPeasrsonInterval(mat,prop)
+
 def CreatEOSFolder(abs_path):
     subprocess.call(["mkdir", "-p", abs_path])
     subprocess.call(["cp", "/eos/user/f/fivone/www/index.php",abs_path+"/index.php"])
@@ -1109,18 +1128,17 @@ def GetRunNumber(input_string):
     return run_number
 
 if __name__ == '__main__':
-    print("MergedRuns_700uA_10kHz_Trim")
-    printEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/CSV/MergedRuns_700uA_10kHz_Trim/")
-    print()
-    print("Merged_NovCRUZET_700uA_10kHz")
-    printEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/CSV/Merged_NovCRUZET_700uA_10kHz/")
-    print()
-    print("MergeCRAFT_700uA_STDGasFlow")
-    printEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/CSV/MergeCRAFT_700uA_STDGasFlow/")
-    print()    
-    print("MergeCRAFT_700uA_LoweredGasFlow")
-    printEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/CSV/MergeCRAFT_700uA_LoweredGasFlow/")
-    print()    
+    
+    match = {"std":0,"poslow":0,"alllow":0}
+    prop = {"std":0,"poslow":0,"alllow":0}
+    for region in [1]:
+        for layer in [1,2]:
+            for chamber in range(1,37):
+                ch_ID = ReChLa2chamberName(region,chamber,layer) 
+                std=ChamberEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/CSV/MergeCRAFT_700uA_STDGasFlow/",ch_ID)
+                pos_low=ChamberEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/CSV/MergeCRAFT_700uA_PosLowGasFlow/",ch_ID)
+                all_low=ChamberEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/CSV/MergeCRAFT_700uA_AllLowGasFlow/",ch_ID)
+                
+                print '{:20}{:<20}{:<20}{:<20}'.format(ch_ID,std[2],pos_low[2],all_low[2])
 
-
-pass
+    pass
