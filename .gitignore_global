@@ -1,0 +1,16 @@
+# Python compiled files
+*.pyc
+*.root
+Output/PFA_Analyzer_Output/Plot/*
+Output/PFA_Analyzer_Output/CSV/*
+Output/PFA_Analyzer_Output/EvtDspl/*
+Output/HVScan/*
+Output/CompareCSV/*
+Output/EfficiencyDistribution/*
+CondorSub/JobFiles/Logs/*
+ExecuteScripts/
+ExcludeMe/
+CondorSub/JobFiles/fivone.cc
+CondorSub/JobFiles/*sh
+CondorSub/JobFiles/*sub
+lib/*pyc
