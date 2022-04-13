@@ -4,12 +4,20 @@ import argparse
 from argparse import RawTextHelpFormatter
 import re as regularExpression
 
+base_folder = os.path.expandvars('$PFA')
+sys.path.insert(1, base_folder+"/Analyzer/lib/")
+try:
+    from PFA_Analyzer_Utils import *
+except:
+   print ("ERROR:\n\tCan't find the package PFA_Analyzer_Utils in ",lib_folder,"\nEXITING...\n")
+   sys.exit(0)
 
-def generateSubFile(outputName):
+
+def generateSubFile(outputName,shell_name):
     job_flavour = "tomorrow"
-    SubfileName = "/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/CondorSub/JobFiles/SubmitFile_"+str(outputName)+".sub"
+    SubfileName = base_folder+"/Analyzer/CondorSub/JobFiles/SubmitFile_"+str(outputName)+".sub"
     with open(SubfileName, 'w') as sout:
-        sout.write("executable              = job_Run_"+str(outputName)+".sh"+"\n")
+        sout.write("executable              = "+shell_name+"\n")
         sout.write("getenv                  = true"+"\n")
         sout.write("arguments               = $(ClusterId) $(ProcId)"+"\n")
         sout.write("output                  = ./Logs/out.$(ClusterId)_Run"+str(outputName)+".dat"+"\n")
@@ -22,7 +30,7 @@ def generateSubFile(outputName):
     return SubfileName
 
 def generateJobShell(run_number,outputName,pc,rdpc,minPt,max_NormChi2,minME1Hit,minME2Hit,minME3Hit,minME4Hit,maxErrOnPropR,maxErrOnPropPhi,maskChVFAT,doubleLayerEfficiency):
-    run_number_int = int(regularExpression.sub("[^0-9]", "", run_number))
+    run_number_int = GetRunNumber(run_number)
     main_command = "python PFA_Analyzer.py --dataset "+str(run_number)+" -pc " +str(pc) + " -rdpc "+str(rdpc)+" --outputname "+outputName+" --minPt "+str(minPt) +   " --chi2cut "+str(max_NormChi2) +" --minME1 "+str(minME1Hit) + " --minME2 "+str(minME2Hit) +  " --minME3 "+str(minME3Hit) + " --minME4 "+str(minME4Hit) + " --maxErrPropR "+str(maxErrOnPropR)+" --maxErrPropPhi "+str(maxErrOnPropPhi)
         
     if maskChVFAT == True: 
@@ -32,15 +40,15 @@ def generateJobShell(run_number,outputName,pc,rdpc,minPt,max_NormChi2,minME1Hit,
         
     main_command = main_command + " \n"
 
-
-    with open("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/CondorSub/JobFiles/job_Run_"+str(outputName)+".sh", 'w') as fout:
+    shell_script_name = base_folder+"/Analyzer/CondorSub/JobFiles/job_Run_"+str(outputName)+".sh"
+    with open(shell_script_name, 'w') as fout:
         ####### Write the instruction for each job
         fout.write("#!/bin/sh\n")
         fout.write("echo\n")
         fout.write("echo %s_Run"+str(run_number)+"\n")
         fout.write("echo\n")
         fout.write("echo 'START---------------'\n")
-        fout.write("cd /afs/cern.ch/user/f/fivone/Test/PFA_Analyzer"+"\n")
+        fout.write("cd /afs/cern.ch/user/f/fivone/Test/Analyzer"+"\n")
         ## sourceing the right gcc version to compile the source code
         fout.write("source /cvmfs/sft.cern.ch/lcg/contrib/gcc/9.1.0/x86_64-centos7/setup.sh"+"\n")
         fout.write("source /cvmfs/sft.cern.ch/lcg/app/releases/ROOT/6.18.04/x86_64-centos7-gcc48-opt/bin/thisroot.sh"+"\n")
@@ -48,6 +56,7 @@ def generateJobShell(run_number,outputName,pc,rdpc,minPt,max_NormChi2,minME1Hit,
         fout.write("ClusterId=$1\n")
         fout.write("ProcId=$2\n")
         fout.write(main_command)
+    return shell_script_name
 if __name__=='__main__':
     parser = argparse.ArgumentParser(
         description='''Scripts runs PFA_Analyzer.py for many different input runs''',
@@ -108,8 +117,35 @@ if __name__=='__main__':
     for index in range(len(inputs)):
         run = inputs[index]
         name = outputs[index]
+
+        if maskChVFAT:
+            ## Mask chamber empty, in error or with eq. divider current not at 700
+            os.system("python "+base_folder+"/Chamber_MaskMaker/PFA_MaskGenerator.py -rl "+str(GetRunNumber(run))+ " -iexpl 700 ")
+
+            ## Crate job files for vfat_masking
+            os.system("python /afs/cern.ch/user/f/fivone/Test/VFAT_MaskMaker/run_step.py -r "+run)
+
+            condorsubmit1_file = base_folder+"/VFAT_MaskMaker/CondorFiles/condor_step1_"+run+".submit"
+            condorsubmit2_file = base_folder+"/VFAT_MaskMaker/CondorFiles/condor_step2_"+run+".submit"
+
+
+        shell_name = generateJobShell(run,name,pc,rdpc,minPt,maxSTA_NormChi2,minME1Hit,minME2Hit,minME3Hit,minME4Hit,maxErrOnPropR,maxErrOnPropPhi,maskChVFAT,DLE)
+        SubfileName = generateSubFile(name,shell_name)
         
-        SubfileName = generateSubFile(name)
-        generateJobShell(run,name,pc,rdpc,minPt,maxSTA_NormChi2,minME1Hit,minME2Hit,minME3Hit,minME4Hit,maxErrOnPropR,maxErrOnPropPhi,maskChVFAT,DLE)
-        os.chdir("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/CondorSub/JobFiles/")
-        os.system("condor_submit "+SubfileName)
+        # os.chdir("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/CondorSub/JobFiles/")
+        # os.system("condor_submit "+SubfileName)
+
+        # prepare CONDOR DAG file:  will run step1 submission and then, at the step1 termination, will run step2        
+        condorDAG_file = "./condor_DAG_"+run+".dag"
+        with open(condorDAG_file, "w") as DAG_file:
+            DAG_file.write(
+                """
+JOB A {step1VFAT_submit}
+JOB B {step2VFAT_submit}
+JOB C {analysis_submit}
+PARENT A CHILD B
+PARENT B CHILD C
+                """.format(step1VFAT_submit=condorsubmit1_file,step2VFAT_submit=condorsubmit2_file,analysis_submit=SubfileName))
+            
+        # os.system("condor_submit_dag -dont_suppress_notification "+condorDAG_file)
+

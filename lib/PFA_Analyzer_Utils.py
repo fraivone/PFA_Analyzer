@@ -1039,7 +1039,7 @@ def fillMatchingTreeArray(PropHitonEta,prop_hit_index,RecHitonEta,reco_hit_index
     return recHit_Matching,propHit_Matching
 
 def store4evtDspl(name,run,lumi,evt):
-    evtDspl_dir = "/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/EvtDspl/"
+    evtDspl_dir = "/afs/cern.ch/user/f/fivone/Test/Analyzer/Output/PFA_Analyzer_Output/EvtDspl/"
     with open(evtDspl_dir+name+".txt", 'a+') as f:
         f.write(str(run)+":"+str(lumi)+":"+str(evt)+"\n")
 
@@ -1128,8 +1128,8 @@ def GetRunNumber(input_string):
     return run_number
 
 if __name__ == '__main__':
-    print ChamberEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/CSV/MergeCRAFT_700uA_STDGasFlow","GE11-P-04L2-L")[0]/ChamberEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/CSV/MergeCRAFT_700uA_STDGasFlow","GE11-P-04L2-L")[1]
+    print ChamberEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/Analyzer/Output/PFA_Analyzer_Output/CSV/MergeCRAFT_700uA_STDGasFlow","GE11-P-04L2-L")[0]/ChamberEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/Analyzer/Output/PFA_Analyzer_Output/CSV/MergeCRAFT_700uA_STDGasFlow","GE11-P-04L2-L")[1]
 
-    print ChamberEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/CSV/MergeCRAFT_700uA_AllLowGasFlow/","GE11-P-04L2-L")[0]/ChamberEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/CSV/MergeCRAFT_700uA_AllLowGasFlow/","GE11-P-04L2-L")[1]
+    print ChamberEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/Analyzer/Output/PFA_Analyzer_Output/CSV/MergeCRAFT_700uA_AllLowGasFlow/","GE11-P-04L2-L")[0]/ChamberEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/Analyzer/Output/PFA_Analyzer_Output/CSV/MergeCRAFT_700uA_AllLowGasFlow/","GE11-P-04L2-L")[1]
 
     pass
