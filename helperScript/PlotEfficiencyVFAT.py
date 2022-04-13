@@ -11,7 +11,7 @@ from lib.THR_Utils_v2 import *
 
 parser = argparse.ArgumentParser(
         description='''Scripts that prouces efficiency per VFAT/Chamber''',
-        epilog="""Typical exectuion  (from top folder)\n\t  python -m helperScript.PlotEfficiencyVFAT --input 690uA_MergedRuns_NoTrim_byVFAT""",
+        epilog="""Typical exectuion  (from top folder)\n\t  python -m helperScript.PlotEfficiencyVFAT --input 350107_Express --output 350107 --batch""",
         formatter_class=RawTextHelpFormatter
         )
 
@@ -53,7 +53,7 @@ df = pd.read_csv(inputFile, sep=',')
 EfficiencyDictVFAT = generateVFATDict(['glb_rdphi'])
 
 
-for re,la in [(-1,1),(1,1),(-1,2),(1,2)]: 
+for re,la in [(-1,2),(1,1),(-1,1),(1,2)]: 
     
     endcapTag = EndcapLayer2label(re,la)
     CreatEOSFolder(outputFolder+"/"+endcapTag)
@@ -76,8 +76,12 @@ for re,la in [(-1,1),(1,1),(-1,2),(1,2)]:
             VFAT_N = []
         if args.verbose: print "Processing ", current_chamber_ID
         for VFATN in range(24):
-            EfficiencyDictVFAT['glb_rdphi'][endcapTag][current_chamber_ID][VFATN]['num'] = df[ (df['chamberID']==current_chamber_ID) &(df['VFATN']==VFATN)]["matchedRecHit"].values[0]
-            EfficiencyDictVFAT['glb_rdphi'][endcapTag][current_chamber_ID][VFATN]['den'] = df[ (df['chamberID']==current_chamber_ID) &(df['VFATN']==VFATN)]["propHit"].values[0]
+            if current_chamber_ID in df['chamberID'].tolist():
+                EfficiencyDictVFAT['glb_rdphi'][endcapTag][current_chamber_ID][VFATN]['num'] = df[ (df['chamberID']==current_chamber_ID) &(df['VFATN']==VFATN)]["matchedRecHit"].values[0]
+                EfficiencyDictVFAT['glb_rdphi'][endcapTag][current_chamber_ID][VFATN]['den'] = df[ (df['chamberID']==current_chamber_ID) &(df['VFATN']==VFATN)]["propHit"].values[0]
+            else: 
+                EfficiencyDictVFAT['glb_rdphi'][endcapTag][current_chamber_ID][VFATN]['num'] = 0
+                EfficiencyDictVFAT['glb_rdphi'][endcapTag][current_chamber_ID][VFATN]['den'] = 0
 
             if enable_THR:
                 THR.append(GetVFAT_THRDAC(current_chamber_ID,VFATN))
@@ -143,8 +147,8 @@ for re,la in [(-1,1),(1,1),(-1,2),(1,2)]:
 
     c1.Modified()
     c1.Update()
-    # c1.SaveAs(outputFolder+endcapTag+".pdf")
-    # Convert2png(outputFolder+endcapTag+".pdf")
+    c1.SaveAs(outputFolder+endcapTag+".pdf")
+    Convert2png(outputFolder+endcapTag+".pdf")
     
 
 

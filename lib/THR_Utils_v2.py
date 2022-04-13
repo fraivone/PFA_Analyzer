@@ -7,7 +7,7 @@ import sys
 import os
 import json
  
-sys.path.append(os.path.abspath("/eos/project-c/cmsgemonline/public/"))
+sys.path.append(os.path.abspath("/eos/project-c/cmsgemonline/public/doc/"))
 from chamber_mapping import chamber_mapping as mapping
 
 TRIMDAC2fC = 2.1/63     # VFAT Design --> 63 TRIM DAC = 2.1 fC

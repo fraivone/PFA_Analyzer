@@ -1046,7 +1046,7 @@ def store4evtDspl(name,run,lumi,evt):
 def printEfficiencyFromCSV(path):
     file_path = path + "/MatchingSummary_glb_rdphi.csv"
     print file_path,"\n"
-    print '{:<20}{:<20}{:<20}{:<20}{:<20}'.format("Region","AnalyzedChambers","Matched","Propagated","Eff. 68%CL")
+    print '{:<8}{:<20}{:<20}{:<20}{:<20}'.format("Region","AnalyzedChambers","Matched","Propagated","Eff. 68%CL")
 
 
     all_prop=0
@@ -1071,9 +1071,9 @@ def printEfficiencyFromCSV(path):
         all_pt+=AVGpt
         analyzed_Chambers = float(len(df))/8
         all_chamb+=analyzed_Chambers
-        print '{:<20}{:<20}{:<20}{:<20}{:<20}'.format(region,analyzed_Chambers,Matched,Propagated,generateClopperPeasrsonInterval(Matched,Propagated))
+        print '{:<8}{:<20}{:<20}{:<20}{:<20}'.format(region,analyzed_Chambers,Matched,Propagated,generateClopperPeasrsonInterval(Matched,Propagated))
 
-    print '{:<20}{:<20}{:<20}{:<20}{:<20}'.format("all",all_chamb,all_mat,all_prop,generateClopperPeasrsonInterval(all_mat,all_prop))
+    print '{:<8}{:<20}{:<20}{:<20}{:<20}'.format("all",all_chamb,all_mat,all_prop,generateClopperPeasrsonInterval(all_mat,all_prop))
     print "##############\n"  
 
 
@@ -1128,17 +1128,8 @@ def GetRunNumber(input_string):
     return run_number
 
 if __name__ == '__main__':
-    
-    match = {"std":0,"poslow":0,"alllow":0}
-    prop = {"std":0,"poslow":0,"alllow":0}
-    for region in [1]:
-        for layer in [1,2]:
-            for chamber in range(1,37):
-                ch_ID = ReChLa2chamberName(region,chamber,layer) 
-                std=ChamberEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/CSV/MergeCRAFT_700uA_STDGasFlow/",ch_ID)
-                pos_low=ChamberEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/CSV/MergeCRAFT_700uA_PosLowGasFlow/",ch_ID)
-                all_low=ChamberEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/CSV/MergeCRAFT_700uA_AllLowGasFlow/",ch_ID)
-                
-                print '{:20}{:<20}{:<20}{:<20}'.format(ch_ID,std[2],pos_low[2],all_low[2])
+    print ChamberEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/CSV/MergeCRAFT_700uA_STDGasFlow","GE11-P-04L2-L")[0]/ChamberEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/CSV/MergeCRAFT_700uA_STDGasFlow","GE11-P-04L2-L")[1]
+
+    print ChamberEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/CSV/MergeCRAFT_700uA_AllLowGasFlow/","GE11-P-04L2-L")[0]/ChamberEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/Output/PFA_Analyzer_Output/CSV/MergeCRAFT_700uA_AllLowGasFlow/","GE11-P-04L2-L")[1]
 
     pass

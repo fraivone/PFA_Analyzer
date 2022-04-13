@@ -18,11 +18,11 @@ parser.add_argument('--output', type=str , help="Output file name",required=Fals
 parser.add_argument('--labels', type=str , help="Label with which the runs should be listed in the legend (according to inputs order). If not provided, input names will be used",required=False,nargs='*')
 parser.add_argument('--batch', default=False, action='store_true',help="ROOT in batch mode",required=False)
 
-
+chamber_with_short =[] # ["GE11-P-07L2-S", "GE11-P-09L2-S", "GE11-P-10L2-L", "GE11-P-12L1-L", "GE11-P-14L1-L", "GE11-P-15L1-S", "GE11-P-15L2-S", "GE11-P-18L1-L", "GE11-P-24L2-L", "GE11-P-34L2-L", "GE11-P-36L1-L", "GE11-P-36L2-L", "GE11-M-05L2-S", "GE11-M-05L1-S", "GE11-M-06L1-L", "GE11-M-07L1-S", "GE11-M-10L2-L", "GE11-M-17L2-S", "GE11-M-19L2-S", "GE11-M-21L1-S", "GE11-M-23L1-S", "GE11-M-29L1-S", "GE11-M-30L1-L", "GE11-M-31L2-S", "GE11-M-33L1-S", "GE11-M-35L1-S"] 
 
 args = parser.parse_args()
 inputs = ["./Output/PFA_Analyzer_Output/CSV/"+i+"/MatchingSummary_glb_rdphi.csv" for i in args.inputs]
-output = args.output if args.output is not None else "EfficiencyDistribution"
+output = args.output
 label_list = args.labels if args.labels is not None else args.inputs
 
 if len(label_list) != len(inputs):
@@ -38,9 +38,9 @@ ROOT.gStyle.SetPalette(ROOT.kRainBow)
 ## ROOT Objects
 TH1F_Container = [ i for i in range(len(inputs))]
 Cumulative_Container = [ i for i in range(len(inputs))]
-hs = ROOT.THStack("hs","EfficiencyDistribution")
-hCumulative = ROOT.THStack("hCumulative","CumulativeDistribution")
-hCumulative.SetMaximum(150)
+hs = ROOT.THStack("hs",output+"_EfficiencyDistribution")
+hCumulative = ROOT.THStack("hCumulative",output+"_CumulativeDistribution")
+hCumulative.SetMaximum(110)
 
 
 
@@ -63,6 +63,10 @@ for index_input_file,file_path in enumerate(inputs):
         etaP = row['etaPartition']
         propHit = row['propHit']
         matchedRecHit = row['matchedRecHit']
+
+        if ReChLa2chamberName(region,chamber,layer) in chamber_with_short:
+            # print "Skipping ",ReChLa2chamberName(region,chamber,layer)," cause it has a short"
+            continue
         
         etaPartitionID =  region*(100*chamber+10*layer+etaP)
 
