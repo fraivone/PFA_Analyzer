@@ -48,7 +48,7 @@ def generateJobShell(run_number,outputName,pc,rdpc,minPt,max_NormChi2,minME1Hit,
         fout.write("echo %s_Run"+str(run_number)+"\n")
         fout.write("echo\n")
         fout.write("echo 'START---------------'\n")
-        fout.write("cd /afs/cern.ch/user/f/fivone/Test/Analyzer"+"\n")
+        fout.write("cd "+base_folder+"/Analyzer/"+"\n")
         ## sourceing the right gcc version to compile the source code
         fout.write("source /cvmfs/sft.cern.ch/lcg/contrib/gcc/9.1.0/x86_64-centos7/setup.sh"+"\n")
         fout.write("source /cvmfs/sft.cern.ch/lcg/app/releases/ROOT/6.18.04/x86_64-centos7-gcc48-opt/bin/thisroot.sh"+"\n")
@@ -114,16 +114,19 @@ if __name__=='__main__':
         print "Parsed runList and outputNames are different in number...\nExiting .."
         sys.exit(0)    
 
+    if maskChVFAT:
+        ## Mask chamber empty, in error or with eq. divider current not at 700
+        run_string = " ".join( [str(GetRunNumber(i)) for i in inputs])
+        eq_divid_current = ''.join(["700 " for i in range(len(inputs))])
+        os.system("python "+base_folder+"/Chamber_MaskMaker/PFA_MaskGenerator.py -rl "+run_string+ " -iexpl "+eq_divid_current)
+
+
     for index in range(len(inputs)):
         run = inputs[index]
         name = outputs[index]
-
         if maskChVFAT:
-            ## Mask chamber empty, in error or with eq. divider current not at 700
-            os.system("python "+base_folder+"/Chamber_MaskMaker/PFA_MaskGenerator.py -rl "+str(GetRunNumber(run))+ " -iexpl 700 ")
-
             ## Crate job files for vfat_masking
-            os.system("python /afs/cern.ch/user/f/fivone/Test/VFAT_MaskMaker/run_step.py -r "+run)
+            os.system("python "+base_folder+"/VFAT_MaskMaker/run_step.py -r "+run)
 
             condorsubmit1_file = base_folder+"/VFAT_MaskMaker/CondorFiles/condor_step1_"+run+".submit"
             condorsubmit2_file = base_folder+"/VFAT_MaskMaker/CondorFiles/condor_step2_"+run+".submit"
@@ -132,10 +135,8 @@ if __name__=='__main__':
         shell_name = generateJobShell(run,name,pc,rdpc,minPt,maxSTA_NormChi2,minME1Hit,minME2Hit,minME3Hit,minME4Hit,maxErrOnPropR,maxErrOnPropPhi,maskChVFAT,DLE)
         SubfileName = generateSubFile(name,shell_name)
         
-        # os.chdir("/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/CondorSub/JobFiles/")
-        # os.system("condor_submit "+SubfileName)
 
-        # prepare CONDOR DAG file:  will run step1 submission and then, at the step1 termination, will run step2        
+        # prepare CONDOR DAG file:  will run step1 submission and then, at the step1 termination, will run step2 and finally the analysis        
         condorDAG_file = "./condor_DAG_"+run+".dag"
         with open(condorDAG_file, "w") as DAG_file:
             DAG_file.write(
@@ -147,5 +148,5 @@ PARENT A CHILD B
 PARENT B CHILD C
                 """.format(step1VFAT_submit=condorsubmit1_file,step2VFAT_submit=condorsubmit2_file,analysis_submit=SubfileName))
             
-        # os.system("condor_submit_dag -dont_suppress_notification "+condorDAG_file)
+        os.system("condor_submit_dag -dont_suppress_notification "+condorDAG_file)
 
