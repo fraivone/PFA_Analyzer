@@ -27,7 +27,7 @@ thr_folder_old = "/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/THR_Data/THR_ARM_
 
 args = parser.parse_args()
 enable_THR = args.THR
-inputs = ["./Output/PFA_Analyzer_Output/CSV/"+i+"/MatchingSummary_glb_rdphi.csv" for i in args.inputs]
+inputs = ["./Output/PFA_Analyzer_Output/CSV/"+i+"/MatchingSummary_glb_rdphi_byVFAT.csv" for i in args.inputs]
 run_numbers = [GetRunNumber(i) for i in inputs]
 output = args.output if args.output is not None else run_numbers[0]
 label_list = args.labels if args.labels is not None else args.inputs
