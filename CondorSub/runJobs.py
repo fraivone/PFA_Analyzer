@@ -9,7 +9,7 @@ sys.path.insert(1, base_folder+"/Analyzer/lib/")
 try:
     from PFA_Analyzer_Utils import *
 except:
-   print ("ERROR:\n\tCan't find the package PFA_Analyzer_Utils in ",lib_folder,"\nEXITING...\n")
+   print ("ERROR:\n\tCan't find the package PFA_Analyzer_Utils in ",base_folder+"/Analyzer/lib","\nEXITING...\n")
    sys.exit(0)
 
 
