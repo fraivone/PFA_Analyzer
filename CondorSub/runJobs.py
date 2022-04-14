@@ -1,6 +1,7 @@
 import sys
 import os
 import argparse
+import time
 from argparse import RawTextHelpFormatter
 import re as regularExpression
 
@@ -136,8 +137,10 @@ if __name__=='__main__':
         SubfileName = generateSubFile(name,shell_name)
         
 
-        # prepare CONDOR DAG file:  will run step1 submission and then, at the step1 termination, will run step2 and finally the analysis        
-        condorDAG_file = "./condor_DAG_"+run+".dag"
+        # prepare CONDOR DAG file:  will run step1 submission and then, at the step1 termination, will run step2 and finally the analysis
+        condor_folder = base_folder+"/Analyzer/CondorSub/JobFiles/DAG"+run+"_"+time.strftime("%-y%m%d_%H%M")+"/"
+        condorDAG_file = condor_folder+"/condor_DAG_"+run+".dag"
+        os.system("mkdir -p "+condor_folder)
         with open(condorDAG_file, "w") as DAG_file:
             DAG_file.write(
                 """
