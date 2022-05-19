@@ -211,7 +211,7 @@ for index,key in enumerate(Multigraph_Dict.keys()):
 c2.Modified()
 c2.Update()
 
-folder_name = "/eos/user/f/fivone/www/run"+output
+folder_name = "./Output/CompareCSV/"+output
 CreatEOSFolder(folder_name)
 
 outputPath = folder_name+"/"+output+".pdf"
