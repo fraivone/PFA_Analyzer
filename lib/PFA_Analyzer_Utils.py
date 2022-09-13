@@ -670,14 +670,14 @@ def generate2DEfficiencyPlotbyVFAT(EfficiencyDictVFAT,efficiency_target):
                 elif VFAT_num == 0:
                     efficiency = 0.01 ## Avoid empty label when printing it with text
                 else:
-                    efficiency = round(float(VFAT_num)/VFAT_den,2)
+                    efficiency = 100*round(float(VFAT_num)/VFAT_den,3)
 
                 selected_bin = h2p.AddBin(4,rotated_and_translated_x,rotated_and_translated_y)
                 h2p.SetBinContent(selected_bin,efficiency)
                 h2p.SetMarkerSize(.3) ## Reduces the text size when drawing the option "COLZ TEXT"
                 
-                h2p.GetXaxis().SetTitle("Glb x (cm)")
-                h2p.GetYaxis().SetTitle("Glb y (cm)")
+                h2p.GetXaxis().SetTitle("Global x (cm)")
+                h2p.GetYaxis().SetTitle("Global y (cm)")
     else:
         chamber_ID = efficiency_target
         re_ch_la_list = chamberName2ReChLa(chamber_ID)
@@ -768,7 +768,7 @@ def generateEfficiencyPlotbyPt(sourceDict,input_region=[-1,1],input_layer=[1,2])
 
 
 def generateEfficiencyDistribution(sourceDict):
-    EfficiencyDistribution = ROOT.TH1F("EfficiencyDistribution","EfficiencyDistribution",100,0,1.)
+    EfficiencyDistribution = ROOT.TH1F("EfficiencyDistribution","EfficiencyDistribution",100,0.,100.)
 
     Num = {}
     Den = {}
@@ -794,13 +794,24 @@ def generateEfficiencyDistribution(sourceDict):
     for k in Num.keys():
         if (Den[k] != 0):
             Eff[k] = float(Num[k])/float(Den[k])
-        EfficiencyDistribution.Fill(Eff[k])
+        EfficiencyDistribution.Fill(100*Eff[k])
     OverFlow = EfficiencyDistribution.GetBinContent(101)
     UnderFlow = EfficiencyDistribution.GetBinContent(0)
-
     return EfficiencyDistribution
 
 
+def generateEffDistr(filepath):
+    EfficiencyDistribution = ROOT.TH1F("EfficiencyDistribution","EfficiencyDistribution",50,50.,100.)
+    for re,la in [(-1,1),(1,1),(-1,2),(1,2)]: 
+        for chamber in range(1,37):
+            chamberID = ReChLa2chamberName(re,chamber,la)
+            n,d,_ = ChamberEfficiencyFromCSV(filepath,chamberID)
+            if float(d) !=0.:
+                EfficiencyDistribution.Fill(100*float(n)/d)
+    return EfficiencyDistribution
+            
+    
+    
             
 
 def generateEfficiencyPlot2DGE11(sourceDict,input_region=1,input_layer=1,debug=False):
@@ -1044,7 +1055,7 @@ def store4evtDspl(name,run,lumi,evt):
         f.write(str(run)+":"+str(lumi)+":"+str(evt)+"\n")
 
 def printEfficiencyFromCSV(path):
-    file_path = path + "/MatchingSummary_glb_rdphi.csv"
+    file_path = path + "/MatchingSummary_glb_rdphi_byVFAT.csv"
     print file_path,"\n"
     print '{:<8}{:<20}{:<20}{:<20}{:<20}'.format("Region","AnalyzedChambers","Matched","Propagated","Eff. 68%CL")
 
@@ -1071,14 +1082,14 @@ def printEfficiencyFromCSV(path):
         all_pt+=AVGpt
         analyzed_Chambers = float(len(df))/8
         all_chamb+=analyzed_Chambers
-        print '{:<8}{:<20}{:<20}{:<20}{:<20}'.format(region,analyzed_Chambers,Matched,Propagated,generateClopperPeasrsonInterval(Matched,Propagated))
+        print '{:<8}{:<20}{:<20}{:<20}{:<20}'.format(region,int(analyzed_Chambers),int(Matched),int(Propagated),generateClopperPeasrsonInterval(Matched,Propagated))
 
-    print '{:<8}{:<20}{:<20}{:<20}{:<20}'.format("all",all_chamb,all_mat,all_prop,generateClopperPeasrsonInterval(all_mat,all_prop))
+    print '{:<8}{:<20}{:<20}{:<20}{:<20}'.format("all",all_chamb,int(all_mat),int(all_prop),generateClopperPeasrsonInterval(all_mat,all_prop))
     print "##############\n"  
 
 
 def ChamberEfficiencyFromCSV(path,chamber):
-    file_path = path + "/MatchingSummary_glb_rdphi.csv"
+    file_path = path + "/MatchingSummary_glb_rdphi_byVFAT.csv"
     prop=0
     mat=0
 
@@ -1100,22 +1111,23 @@ def CreatEOSFolder(abs_path):
     subprocess.call(["cp", "/eos/user/f/fivone/www/index.php",abs_path+"/index.php"])
     run_number = GetRunNumber(abs_path)
     if run_number != "000000":
+        pass
         
-        command = "source /afs/cern.ch/user/f/fivone/Test/FetchOMS/venv/bin/activate; python3 /afs/cern.ch/user/f/fivone/Test/FetchOMS/RecordedLumi.py  --RunList "+run_number
-        p = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True,stderr=subprocess.PIPE)
-        (output, err) = p.communicate()  
-        #Wait until finished...
-        p_status = p.wait()
-        labels = output.splitlines()[0].split(";")
-        values = output.splitlines()[1].split(";")
+        # command = "source /afs/cern.ch/user/f/fivone/Test/FetchOMS/venv/bin/activate; python3 /afs/cern.ch/user/f/fivone/Test/FetchOMS/RecordedLumi.py  --RunList "+run_number
+        # p = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True,stderr=subprocess.PIPE)
+        # (output, err) = p.communicate()  
+        # #Wait until finished...
+        # p_status = p.wait()
+        # labels = output.splitlines()[0].split(";")
+        # values = output.splitlines()[1].split(";")
 
-        with open (abs_path+"/runInfo.txt",'w+') as f:
-            for index in range(len(labels)):
-                line_to_write = '{:<20}  {:<20}'.format(labels[index].replace(" ",""), values[index].replace(" ",""))+"\n"
-                f.write(line_to_write)
+        # with open (abs_path+"/runInfo.txt",'w+') as f:
+        #     for index in range(len(labels)):
+        #         line_to_write = '{:<20}  {:<20}'.format(labels[index].replace(" ",""), values[index].replace(" ",""))+"\n"
+        #         f.write(line_to_write)
 
 def Convert2png(file_path):
-    subprocess.call(["convert","-density", "300", "-trim", file_path, "-quality", "100", file_path.replace("pdf","png")])
+    subprocess.call(["convert","-density", "300", "-trim", file_path, "-quality", "100","-sharpen","0x1,0", file_path.replace("pdf","png")])
 def GetRunNumber(input_string):
     run_number = "000000"
     ## the run number has 6 digis, followed by _
@@ -1127,9 +1139,22 @@ def GetRunNumber(input_string):
     
     return run_number
 
+def VFATEfficiencyFromCSV(df):
+    for index, row in df.iterrows():
+        matched = float(row['matchedRecHit'])
+        prop = float(row['propHit'])
+        Name = row['chamberID']
+        VFATN = row['VFATN']
+        if prop == 0:
+            continue
+        else:
+            if matched/prop < 0.3:
+                print Name+"\t"+str(VFATN)+"\t"+str(matched/prop)
+
 if __name__ == '__main__':
-    print ChamberEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/Analyzer/Output/PFA_Analyzer_Output/CSV/MergeCRAFT_700uA_STDGasFlow","GE11-P-04L2-L")[0]/ChamberEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/Analyzer/Output/PFA_Analyzer_Output/CSV/MergeCRAFT_700uA_STDGasFlow","GE11-P-04L2-L")[1]
-
-    print ChamberEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/Analyzer/Output/PFA_Analyzer_Output/CSV/MergeCRAFT_700uA_AllLowGasFlow/","GE11-P-04L2-L")[0]/ChamberEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Test/Analyzer/Output/PFA_Analyzer_Output/CSV/MergeCRAFT_700uA_AllLowGasFlow/","GE11-P-04L2-L")[1]
-
-    pass
+    # df = pd.read_csv("/afs/cern.ch/user/f/fivone/Test/Analyzer/Output/PFA_Analyzer_Output/CSV/357333_Express/MatchingSummary_glb_phi_byVFAT.csv")
+    # VFATEfficiencyFromCSV(df)
+    hit=300
+    print(generateClopperPeasrsonInterval(2,95))
+    print(generateClopperPeasrsonInterval(2,3))
+    print(generateClopperPeasrsonInterval(2,3))
