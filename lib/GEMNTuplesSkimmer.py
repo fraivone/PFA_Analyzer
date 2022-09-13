@@ -28,7 +28,7 @@ for folder in args.dataset:
 
 
 n = len(files)
-print (files)
+#print (files)
 chain = ROOT.TChain("muNtupleProducer/MuDPGTree")
 print "Chaining ",n," files"
 for index,fl in enumerate(files):
@@ -41,14 +41,29 @@ OutF = ROOT.TFile("/eos/user/f/fivone/GEMNTuples/"+args.dataset[0]+".root","RECR
 
 ## Selecting useful branches, skim the others
 chain.SetBranchStatus("*", 0)
-chain.SetBranchStatus("event_eventNumber", 1)
-chain.SetBranchStatus("mu_propagated_isME11", 1)
-chain.SetBranchStatus("mu_propagated_nME1hits",1)
-chain.SetBranchStatus("mu_propagatedSeg_chamber",1)
-chain.SetBranchStatus("mu_propagatedSeg_region",1)
-chain.SetBranchStatus("mu_propagatedSeg_layer",1)
-chain.SetBranchStatus("mu_propagatedSegGlb_x",1)
-chain.SetBranchStatus("mu_propagatedSegGlb_y",1)
+## PROPAGATED HITS
+chain.SetBranchStatus("mu_propagated_region")
+chain.SetBranchStatus("mu_propagated_chamber")
+chain.SetBranchStatus("mu_propagated_layer")
+chain.SetBranchStatus("mu_propagated_etaP")
+chain.SetBranchStatus("mu_propagatedGlb_r")
+chain.SetBranchStatus("mu_propagatedLoc_x")
+chain.SetBranchStatus("mu_propagatedLoc_x")
+chain.SetBranchStatus("mu_propagated_pt")
+
+
+#### FLOWER EVENTS
+# chain.SetBranchStatus("event_1stLast_L1A",1)
+# chain.SetBranchStatus("event_2ndLast_L1A",1)
+# chain.SetBranchStatus("event_3rdLast_L1A",1)
+# chain.SetBranchStatus("event_4thLast_L1A",1)
+# chain.SetBranchStatus("gemRecHit_region",1)
+# chain.SetBranchStatus("gemRecHit_chamber",1)
+# chain.SetBranchStatus("gemRecHit_layer",1)
+# chain.SetBranchStatus("gemRecHit_etaPartition",1)
+# chain.SetBranchStatus("gemRecHit_firstClusterStrip",1)
+
+
 
 
 OutF.cd()
