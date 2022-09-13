@@ -6,7 +6,7 @@ import numpy as np
 import sys
 import os
 import json
- 
+from PFA_Analyzer_Utils import * 
 sys.path.append(os.path.abspath("/eos/project-c/cmsgemonline/public/doc/"))
 from chamber_mapping import chamber_mapping as mapping
 
@@ -24,16 +24,15 @@ def GetCHDict(chamber_ID,run=348832):
         OHLink = int(tupl[2])
         fed = 1466 + crate
         
-        file_path = "/eos/project-c/cmsgemonline/public/runs/run"+str(run)+"/fed%d" % fed + "-amc%02d" % amc +"_ConfigInfo.json"
+        file_path = "/afs/cern.ch/user/f/fivone/Test/runParameterGEM/run"+str(run)+"/fed%d" % fed + "-amc%02d" % amc +"_ConfigInfo.json"
 
         try:
                 with open(file_path) as json_file:
                         data_dict = json.load(json_file)
 
         except:
-                print "Can't open ",file_path
-                print "Exiting..."
-                sys.exit(0)
+                ##print "Can't open ",file_path
+                return {}
         ## check exsistance off all keys
         try:
                 data_dict = data_dict['fed'][str(fed)]['slot'][str(amc)]['link'][str(OHLink)]
@@ -49,10 +48,8 @@ def GetVFAT_THRDAC(chamber_ID,VFATN,run=348832):
 
         try:
                 threshold = data['vfat'][str(VFATN)]['THRESHOLD_DAC']
-                latency = data['vfat'][str(VFATN)]['LATENCY']
         except:
-                threshold = -1
-                latency = -1
+                threshold = None
 
         return threshold
 
@@ -61,16 +58,14 @@ def GetVFAT_LATENCY(chamber_ID,VFATN,run=348832):
         data = GetCHDict(chamber_ID,run)
 
         try:
-                threshold = data['vfat'][str(VFATN)]['THRESHOLD_DAC']
                 latency = data['vfat'][str(VFATN)]['LATENCY']
         except:
-                threshold = -1
                 latency = -1
 
         return latency
 
 ## Returns the AVG THR of a chamber       
-def GetOverallChamberThreshold(chamberID,run=348832):
+def GetOverallChamberThreshold(chamberID,run=357329):
 
         if chamberID not in mapping.keys():
                 print "Invalid chamberID",chamberID
@@ -80,15 +75,17 @@ def GetOverallChamberThreshold(chamberID,run=348832):
 
         data = GetCHDict(chamberID,run)
 
+
         temp_array = np.empty(0,dtype=float)
     
         for VFAT_N in range(24):
                 # THR data
                 try:
                         threshold = data['vfat'][str(VFAT_N)]['THRESHOLD_DAC']
-                        temp_array = np.append(temp_array,threshold)
+                        if threshold != -1: temp_array = np.append(temp_array,threshold)
                 except:
-                        print "Can't find THR for\t",chamberID,"\tVFAT:",VFAT_N,"\tSkipping...\n"
+                        continue
+                        #print "Can't find THR for\t",chamberID,"\tVFAT:",VFAT_N,"\tSkipping...",run,"\n"
                 
         # if overall_vfat_trheshold == 10**6:
         #         continue
@@ -105,10 +102,8 @@ def GetOverallChamberThreshold(chamberID,run=348832):
         
 
 if __name__ == "__main__":
-        counter = 0
-        chamber = "GE11-P-04L2-L"
-        for VFATN in range(24):
-                th = GetVFAT_THRDAC(chamber,VFATN,348773)
-                lt = GetVFAT_LATENCY(chamber,VFATN)
-                print chamber,VFATN, th, lt
+        chamber="GE11-P-18L2-L"
+        for v in range(24):
+                print "VFAT ",v,"\tLatency ",GetVFAT_LATENCY(chamber,v,357329),"\tTHR ",GetVFAT_THRDAC(chamber,v,357329)
+        pass
 
