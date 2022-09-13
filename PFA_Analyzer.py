@@ -36,6 +36,8 @@ parser.add_argument('--minME1', type=int, help="Min number of ME1 hits",required
 parser.add_argument('--minME2', type=int, help="Min number of ME2 hits",required=False)
 parser.add_argument('--minME3', type=int, help="Min number of ME3 hits",required=False)
 parser.add_argument('--minME4', type=int, help="Min number of ME4 hits",required=False)
+parser.add_argument('-evts','--nevents', type=int,help="Maximum allowed dphi between RecoHit and PropHit to be counted as matched hit",required=False)
+
 parser.set_defaults(phi_cut=0.001)
 parser.set_defaults(rdphi_cut=0.15)
 parser.set_defaults(chi2cut=9999999)
@@ -49,6 +51,7 @@ parser.set_defaults(fiducialPhi=0.005)
 parser.set_defaults(maxErrPropR=1)
 parser.set_defaults(maxErrPropPhi=0.005)
 parser.set_defaults(outputname=time.strftime("%-y%m%d_%H%M"))
+parser.set_defaults(nevents=-1)
 args = parser.parse_args()
 
 chamberForEventDisplay = ["GE11-P-28L2-L"]
@@ -319,7 +322,8 @@ print "Number of evts \t\t%.2fM\n" %(round(float(chainEntries)/10**6,2))
 
 THSanityChecks['NEvts'].Fill(chainEntries)
 for chain_index,evt in enumerate(chain):
-    
+    if chain_index > args.nevents and args.nevents > 0:
+        break
     if chain_index % 4000 ==0:
         print "[",time.strftime("%B %d - %H:%M:%S"),"]\t",round(float(chain_index)/float(chainEntries),3)*100,"%"
     n_gemprop = len(evt.mu_propagated_chamber)
