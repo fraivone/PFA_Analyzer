@@ -289,7 +289,8 @@ for key_1 in ['Long','Short']:
 chain = ROOT.TChain("muNtupleProducer/MuDPGTree")
 
 print args.dataset, "TChaining ",len(files)," files..."
-print'\n'.join(files)
+#print'\n'.join(files)
+print("Found ",len(files)," files")
 print
 for fl in files:
     chain.Add(fl)
@@ -298,7 +299,7 @@ for fl in files:
 chain.SetBranchStatus("*",0);     
 
 
-branchList=["event_eventNumber","event_lumiBlock","event_runNumber","gemRecHit_region", "gemRecHit_chamber", "gemRecHit_layer", "gemRecHit_etaPartition", "gemRecHit_g_r", "gemRecHit_loc_x", "gemRecHit_g_x", "gemRecHit_g_y", "gemRecHit_g_z", "gemRecHit_g_phi", "gemRecHit_firstClusterStrip", "gemRecHit_cluster_size", "mu_propagated_region", "mu_propagated_chamber", "mu_propagated_layer", "mu_propagated_etaP", "mu_propagated_Outermost_z",  "mu_propagated_isME11", "mu_propagatedGlb_r", "mu_propagatedLoc_x", "mu_propagatedLoc_y", "mu_propagatedGlb_x", "mu_propagatedGlb_y", "mu_propagatedGlb_z", "mu_propagatedGlb_phi", "mu_propagatedGlb_errR", "mu_propagatedGlb_errPhi", "mu_propagatedLoc_dirX", "mu_propagatedLoc_dirY", "mu_propagatedLoc_dirZ", "mu_propagated_pt", "mu_propagated_isGEM", "mu_propagated_TrackNormChi2", "mu_propagated_nME1hits", "mu_propagated_nME2hits", "mu_propagated_nME3hits", "mu_propagated_nME4hits"]
+branchList=["event_eventNumber","event_lumiBlock","event_runNumber","gemRecHit_region", "gemRecHit_chamber", "gemRecHit_layer", "gemRecHit_etaPartition", "gemRecHit_g_r", "gemRecHit_loc_x", "gemRecHit_g_x", "gemRecHit_g_y", "gemRecHit_g_z", "gemRecHit_g_phi", "gemRecHit_firstClusterStrip", "gemRecHit_cluster_size", "mu_propagated_region", "mu_propagated_chamber", "mu_propagated_layer", "mu_propagated_etaP", "mu_propagated_Outermost_z",  "mu_propagated_isME11", "mu_propagatedGlb_r", "mu_propagatedLoc_x", "mu_propagatedLoc_y", "mu_propagatedGlb_x", "mu_propagatedGlb_y", "mu_propagatedGlb_z", "mu_propagatedGlb_phi", "mu_propagatedGlb_errR", "mu_propagatedGlb_errPhi", "mu_propagatedLoc_dirX", "mu_propagatedLoc_dirY", "mu_propagatedLoc_dirZ", "mu_propagated_pt", "mu_propagated_isGEM", "mu_propagated_TrackNormChi2", "mu_propagated_nME1hits", "mu_propagated_nME2hits", "mu_propagated_nME3hits", "mu_propagated_nME4hits"]#,"mu_propagated_ME11Chamber","mu_propagated_ME11Endcap"]
 
 # 2. Enabling the useful ones
 for b in branchList:
@@ -319,9 +320,8 @@ print "Number of evts \t\t%.2fM\n" %(round(float(chainEntries)/10**6,2))
 THSanityChecks['NEvts'].Fill(chainEntries)
 for chain_index,evt in enumerate(chain):
     
-    if chain_index % 40000 ==0:
+    if chain_index % 4000 ==0:
         print "[",time.strftime("%B %d - %H:%M:%S"),"]\t",round(float(chain_index)/float(chainEntries),3)*100,"%"
-        
     n_gemprop = len(evt.mu_propagated_chamber)
     n_gemrec = len(evt.gemRecHit_chamber)
     
@@ -454,6 +454,8 @@ for chain_index,evt in enumerate(chain):
             PropHit_Dict[PropHitChamberID]['pt'].append(evt.mu_propagated_pt[PropHit_index])
             PropHit_Dict[PropHitChamberID]['etaP'].append(etaP)
             PropHit_Dict[PropHitChamberID]['mu_propagated_isME11'].append(evt.mu_propagated_isME11[PropHit_index])
+            #PropHit_Dict[PropHitChamberID]['ME11Chamber'].append(evt.mu_propagated_ME11Chamber[PropHit_index])
+            #PropHit_Dict[PropHitChamberID]['ME11Endcap'].append(evt.mu_propagated_ME11Endcap[PropHit_index])
             PropHit_Dict[PropHitChamberID]['mu_propagated_isGEM'].append(evt.mu_propagated_isGEM[PropHit_index])
             PropHit_Dict[PropHitChamberID]['STA_Normchi2'].append(evt.mu_propagated_TrackNormChi2[PropHit_index])            
             PropHit_Dict[PropHitChamberID]['nME1Hits'].append(evt.mu_propagated_nME1hits[PropHit_index])
@@ -676,6 +678,7 @@ for chain_index,evt in enumerate(chain):
                 # tree_out.Fill()
 
                 EfficiencyDictGlobal[matchingVar][etaPartitionID][pt_index(PropHitonEta['pt'][prop_hit_index])]['num'] += 1
+                #print chamber, PropHitonEta['ME11Chamber'][prop_hit_index]
                 
                 VFAT_propagated = propHit2VFAT(PropHitonEta['glb_r'][prop_hit_index],PropHitonEta['loc_x'][prop_hit_index],eta,region,chamber)
                 EfficiencyDictVFAT[matchingVar][endcapTag][current_chamber_ID][VFAT_propagated]['num'] += 1
