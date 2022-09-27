@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "PFA_Analyzer"
+version = "0.1.0"
+description = "Package to analyze GEM data in P5"
+authors = ["Francesco Ivone <francesco.ivone@cern.ch>"]
+packages = [
+    { include = "ROOT", from = "/usr/lib64/python3.6/site-packages/" },
+    { include = "*.py", from = "./lib"},
+    { include = "*.py", from = "./helperScript"},   
+    { include = "*.py", from = "./CondorSub"}   
+]    
+
+[tool.poetry.dependencies]
+python = "^3.6.8"
+pandas = "1.1.5"
+matplotlib = "^3.3.4"
+scipy = "^1.1.0"
+tqdm = "^4.64.1"
+
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
