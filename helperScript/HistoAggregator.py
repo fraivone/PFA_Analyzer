@@ -8,7 +8,10 @@ Plots that loops through the ROOT files and merges together the plots for a cert
 """
 
 #tags = ["357482_ZMu_cut.root", "357613_ZMu_cut.root", "357333_ZMu_cut.root", "357610_ZMu_cut.root", "357612_ZMu_cut.root", "357611_ZMu_cut.root", "357438_ZMu_cut.root", "357542_ZMu_cut.root", "357330_ZMu_cut.root", "357440_ZMu_cut.root", "357401_ZMu_cut.root", "357442_ZMu_cut.root", "357479_ZMu_cut.root", "357332_ZMu_cut.root", "357329_ZMu_cut.root"]
-tags = ["357333_ZMu_pt_chi2_cut.root", "357613_ZMu_pt_chi2_cut.root", "357610_ZMu_pt_chi2_cut.root", "357482_ZMu_pt_chi2_cut.root", "357542_ZMu_pt_chi2_cut.root", "357330_ZMu_pt_chi2_cut.root", "357611_ZMu_pt_chi2_cut.root", "357440_ZMu_pt_chi2_cut.root", "357438_ZMu_pt_chi2_cut.root", "357612_ZMu_pt_chi2_cut.root", "357401_ZMu_pt_chi2_cut.root", "357442_ZMu_pt_chi2_cut.root", "357332_ZMu_pt_chi2_cut.root", "357479_ZMu_pt_chi2_cut.root", "357329_ZMu_pt_chi2_cut.root"]
+## run 11 17 august
+#tags = ["357333_ZMu_pt_chi2_cut.root", "357613_ZMu_pt_chi2_cut.root", "357610_ZMu_pt_chi2_cut.root", "357482_ZMu_pt_chi2_cut.root", "357542_ZMu_pt_chi2_cut.root", "357330_ZMu_pt_chi2_cut.root", "357611_ZMu_pt_chi2_cut.root", "357440_ZMu_pt_chi2_cut.root", "357438_ZMu_pt_chi2_cut.root", "357612_ZMu_pt_chi2_cut.root", "357401_ZMu_pt_chi2_cut.root", "357442_ZMu_pt_chi2_cut.root", "357332_ZMu_pt_chi2_cut.root", "357479_ZMu_pt_chi2_cut.root", "357329_ZMu_pt_chi2_cut.root"]
+tags = ["357479_Prompt_pt_chi2_cut.root"]
+
 fileNames = [f"/afs/cern.ch/user/f/fivone/Documents/test/Output/PFA_Analyzer_Output/ROOT_File/{tag}" for tag in tags]
 
 ROOT.gROOT.SetBatch(True)
@@ -27,7 +30,17 @@ histo_directives = {"Residual":
                      "Xaxis Title":"R#Delta#phi (cm)",
                      "bins":120,
                      "range":[-0.5,0.5],
-                     "search":"{chamber}*eta*{etaP}*Residual*",
+                     "search":"{chamber}*eta*{etaP}*Residual",
+                     "path":"Residuals/MatchingOn_glb_rdphi",
+                     "color":ROOT.kOrange+2,
+                     "linewidth":2
+                 },
+                    "ResidualY":
+                    {"Title":"Residual eta{etaP}",
+                     "Xaxis Title":"#Delta#LocalY (cm)",
+                     "bins":120,
+                     "range":[-10,10],
+                     "search":"{chamber}*eta*{etaP}*ResidualY",
                      "path":"Residuals/MatchingOn_glb_rdphi",
                      "color":ROOT.kOrange+2,
                      "linewidth":2
