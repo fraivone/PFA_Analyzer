@@ -127,7 +127,7 @@ if __name__=='__main__':
 
         shell_name = generateJobShell(run,name,pc,rdpc,minPt,maxSTA_NormChi2,minME1Hit,minME2Hit,minME3Hit,minME4Hit,maxErrOnPropR,maxErrOnPropPhi,maskChVFAT,DLE)
         SubfileName = generateSubFile(name,shell_name)
-        condorDAG_file = "./condor_DAG_"+run+".dag"
+        condorDAG_file = "./condor_DAG_"+name+".dag"
 
         if maskChVFAT:
             ## Crate job files for vfat_masking
