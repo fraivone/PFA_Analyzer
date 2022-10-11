@@ -11,6 +11,13 @@ import sys
 import json
 from array import array
 
+map_cutcode_to_quantity = {-1:"ErrPropR",
+                           -2:"ErrPropPhi",
+                           -3:"FiducialCuts",
+                           -4:"pT",
+                           -5:"chi2",
+                           -6:"minMExhit"}
+
 
 def getInfoFromEtaID(id):
     etaPartition = abs(id)%10
@@ -318,17 +325,47 @@ def generate2DResidualContainer(matching_variables,nbins,minB):
                         TH2Fresidual_collector[key_1][key_2][key_3][x_bin].setdefault(y_bin,[0,0])
 
     return TH2Fresidual_collector
+    
+
+def generate2DMap_ExcludedHits(nbins,minB,verbose=False):
+    TH2Fresidual_collector = {}
+
+    TH2Fresidual_collector = {'all':{},'short':{},'long':{}}
+    for key_2 in TH2Fresidual_collector:
+        for key_3,value in map_cutcode_to_quantity.items():
+            titleTH2 = key_2 + "chmbr_discardedHits_due2_"+value
+            TH2Fresidual_collector[key_2][value] = ROOT.TH2F(titleTH2,titleTH2,nbins,minB,-minB,nbins,minB,-minB)
+            TH2Fresidual_collector[key_2][value].GetXaxis().SetTitle("Loc_x (cm)")
+            TH2Fresidual_collector[key_2][value].GetYaxis().SetTitle("Loc_y (cm)")
+            if verbose: print(f"dict[{key_2}][{value}] = { TH2Fresidual_collector[key_2][value]}")
+
+    return TH2Fresidual_collector
 
 
-def generate1DResidualContainer(matching_variables,nbins,ResidualCutOff):
+def FillExcludedHits( container, propagatedHits, index, chID, cutPassed):
+    key = map_cutcode_to_quantity[cutPassed] ## reason why the prop hit was excluded
+    ch = chamberName2ReChLa(chID)[1]
+    chamberSize = "short" if ch%2 == 1 else "long"
+
+    loc_y = propagatedHits['loc_y'][index]
+    loc_x = propagatedHits['loc_x'][index]
+
+    container["all"][key].Fill(loc_x,loc_y)
+    container[chamberSize][key].Fill(loc_x,loc_y)
+    
+    return container
+
+
+def generate1DxResidualContainer(matching_variables,nbins,ResidualCutOff):
     output_dict = {}
     for mv in matching_variables:
         output_dict[mv] = {}
         if mv == "glb_rdphi":
             minB = -ResidualCutOff["glb_rdphi"]
+            x_axis_title = "#Deltardphi (cm)"
         else:
             minB = -ResidualCutOff["glb_phi"]
-
+            x_axis_title = "#Deltaphi (rad)"
         for (re,la) in [(1,1),(1,2),(-1,1),(-1,2)]:
             endcap_key = EndcapLayer2label(re,la)
             output_dict[mv][endcap_key] = {}
@@ -339,8 +376,33 @@ def generate1DResidualContainer(matching_variables,nbins,ResidualCutOff):
                 for eta in list(range(1,9))+["All"]:
                     titleTH1 = chID+"_eta"+str(eta)+"_"
                     output_dict[mv][endcap_key][chID][eta]={"Residual":ROOT.TH1F(titleTH1+"Residual",titleTH1+"Residual",nbins,minB,-minB)}
-                    output_dict[mv][endcap_key][chID][eta]["Residual"].GetXaxis().SetTitle("#Deltardphi (cm)")
+                    output_dict[mv][endcap_key][chID][eta]["Residual"].GetXaxis().SetTitle(x_axis_title)
     return output_dict
+
+
+def generate1DyResidualContainer(matching_variables,nbins,ResidualCutOff):
+    output_dict = {}
+    for mv in matching_variables:
+        output_dict[mv] = {}
+        if mv == "glb_rdphi":
+            minB = -10
+            x_axis_title = "#Deltardphi (cm)"
+        else:
+            minB = -10
+            x_axis_title = "#Deltaphi (rad)"
+        for (re,la) in [(1,1),(1,2),(-1,1),(-1,2)]:
+            endcap_key = EndcapLayer2label(re,la)
+            output_dict[mv][endcap_key] = {}
+
+            for chamber in range(1,37):
+                chID = ReChLa2chamberName(re,chamber,la)
+                output_dict[mv][endcap_key][chID] = {}
+                for eta in list(range(1,9))+["All"]:
+                    titleTH1 = chID+"_eta"+str(eta)+"_"
+                    output_dict[mv][endcap_key][chID][eta]={"Residual":ROOT.TH1F(titleTH1+"ResidualY",titleTH1+"ResidualY",nbins,minB,-minB)}
+                    output_dict[mv][endcap_key][chID][eta]["Residual"].GetXaxis().SetTitle(x_axis_title)
+    return output_dict
+
 
 # dict[matchingVar][endcaptag][chamberID][VFAT]
 def generateVFATDict(matching_variables):
@@ -395,22 +457,23 @@ def fillPlot2DResidualContainer(TH2Fresidual_collector,matching_variables,nbins)
 
 def passCut(PropHitonEta,etaPID,prop_hit_index,maxPropR_Err=0.7,maxPropPhi_Err=0.001,fiducialCutR=0.5,fiducialCutPhi=0.002,minPt=0.,maxChi2=9999999,minME1Hit=0,minME2Hit=0,minME3Hit=0,minME4Hit=0):
     passedCut = True
+
     if PropHitonEta['err_glb_phi'][prop_hit_index] > maxPropPhi_Err:
-        passedCut = False
+        passedCut = -2
     if PropHitonEta['err_glb_r'][prop_hit_index] > maxPropR_Err:
-        passedCut = False
+        passedCut = -1
 
     if PropHitonEta['STA_Normchi2'][prop_hit_index] > maxChi2 or PropHitonEta['STA_Normchi2'][prop_hit_index] < 0.5:
-        passedCut = False
+        passedCut = -5
 
     if PropHitonEta['nME1Hits'][prop_hit_index] < minME1Hit:
-        passedCut = False
+        passedCut = -6
     if PropHitonEta['nME2Hits'][prop_hit_index] < minME2Hit:
-        passedCut = False
+        passedCut = -6
     if PropHitonEta['nME3Hits'][prop_hit_index] < minME3Hit:
-        passedCut = False
+        passedCut = -6
     if PropHitonEta['nME4Hits'][prop_hit_index] < minME4Hit:
-        passedCut = False
+        passedCut = -6
 
     
     PhiMin = boundaries[etaPID][1]
@@ -425,10 +488,10 @@ def passCut(PropHitonEta,etaPID,prop_hit_index,maxPropR_Err=0.7,maxPropPhi_Err=0
 
 
     if PropHitPhi < (PhiMin+fiducialCutPhi) or PropHitPhi > (PhiMax-fiducialCutPhi):
-        passedCut = False
+        passedCut = -3
 
     if PropHitPt < minPt:
-        passedCut = False
+        passedCut = -4
     
     ## Fiducial cut on chamber perimeter
     # if PropHitonEta['etaP'][prop_hit_index] == 1 and PropHitonEta['glb_r'][prop_hit_index] > (PropHitonEta['mu_propagated_EtaPartition_rMax'][prop_hit_index]-fiducialCutR):
@@ -441,9 +504,9 @@ def passCut(PropHitonEta,etaPID,prop_hit_index,maxPropR_Err=0.7,maxPropPhi_Err=0
     rMax = boundaries[etaPID][2]
     rMin = boundaries[etaPID][3]
     if PropHitonEta['glb_r'][prop_hit_index] > (rMax-fiducialCutR):
-        passedCut = False
+        passedCut = -3
     if PropHitonEta['glb_r'][prop_hit_index] < (rMin+fiducialCutR):
-        passedCut = False
+        passedCut = -3
     return passedCut
 
 ## Generate confidence level limits for value obtained from ratio of Poissonian
@@ -1078,9 +1141,9 @@ def printEfficiencyFromCSV(path):
     all_mat=0
     all_chamb=0
     all_pt=0
-    for region in [1, -1]:
+    for endcapTag in ["PL1","PL2","ML1","ML2"]:
         df = pd.read_csv(file_path, sep=',')
-        mask = df['region'] == region
+        mask = df['EndcapTag'] == endcapTag
         df = df[mask]
     
         Matched = df["matchedRecHit"].sum()
@@ -1094,11 +1157,11 @@ def printEfficiencyFromCSV(path):
         else:
             AVGpt = 0
         all_pt+=AVGpt
-        analyzed_Chambers = float(len(df))/8
+        analyzed_Chambers = float(len(df))/24
         all_chamb+=analyzed_Chambers
-        print('{:<8}{:<20}{:<20}{:<20}{:<20}'.format(region,int(analyzed_Chambers),int(Matched),int(Propagated),generateClopperPeasrsonInterval(Matched,Propagated)))
+        print('{:<8}{:<20}{:<20}{:<20}{:<20}'.format(endcapTag,int(analyzed_Chambers),int(Matched),int(Propagated),str(generateClopperPeasrsonInterval(Matched,Propagated))))
 
-    print('{:<8}{:<20}{:<20}{:<20}{:<20}'.format("all",all_chamb,int(all_mat),int(all_prop),generateClopperPeasrsonInterval(all_mat,all_prop)))
+    print('{:<8}{:<20}{:<20}{:<20}{:<20}'.format("all",all_chamb,int(all_mat),int(all_prop),str(generateClopperPeasrsonInterval(all_mat,all_prop))))
     print("##############\n")
 
 
@@ -1166,7 +1229,8 @@ def VFATEfficiencyFromCSV(df):
                 print(Name+"\t"+str(VFATN)+"\t"+str(matched/prop))
 
 if __name__ == '__main__':
-    print(generateClopperPeasrsonInterval(2,1617))
+    print("/afs/cern.ch/user/f/fivone/Test/Analyzer/Output/PFA_Analyzer_Output/CSV/357479_ZMu_pt_chi2_cut")
+    printEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Documents/test/Output/PFA_Analyzer_Output/CSV/MergedRuns_660uA")
     # df = pd.read_csv("/afs/cern.ch/user/f/fivone/Test/Analyzer/Output/PFA_Analyzer_Output/CSV/357333_Express/MatchingSummary_glb_phi_byVFAT.csv")
     # VFATEfficiencyFromCSV(df)
     pass
