@@ -365,7 +365,7 @@ def Generate_Uncertainity_Plot(dict_of_fit,reference_geometry):
     return multigraph
 
 ## Save the ROOT obj in the TFile according to the path specified in directory. If a ROOT obj w/ same name exists, skip
-def writeToTFile(file,obj,directory=None):
+def writeToTFile(file,obj,directory=None,forceUpdate=False):
     if directory != None:
         if bool(file.GetDirectory(directory)):
             Tdir = file.GetDirectory(directory)
@@ -374,21 +374,29 @@ def writeToTFile(file,obj,directory=None):
             Tdir = file.GetDirectory(directory)
         Tdir.cd()
         
+        # Force duplicate
+        if forceUpdate:
+            pass
         # Avoid duplicate
-        if Tdir.GetListOfKeys().Contains(obj.GetName()): return
+        else:
+            if Tdir.GetListOfKeys().Contains(obj.GetName()): return
 
     else:
         file.cd()
     
     obj.Write()
 
-def files_in_folder(folder):
+def files_in_folder(folder,filename_tag=None):
     files  = []
 
     for root, dirnames, filenames in os.walk('/eos/cms/store/group/dpg_gem/comm_gem/P5_Commissioning/'):
         if folder in root.split("/") and "GEMCommonNtuples" in root:
-            for filenames in fnmatch.filter(filenames,'*root'):
-                files.append(root+"/"+filenames)
+            for filename in fnmatch.filter(filenames,'*root'):
+                if filename_tag == None:
+                    files.append(root+"/"+filename)
+                else:
+                    if filename_tag in filename:
+                        files.append(root+"/"+filename)
     return files
 
 # bool values are handled with custom type in the ntuples.
@@ -399,3 +407,40 @@ def ROOTBitReferenceVector_to_BoolList(input):
         output.append(bool(j))
     return output
 
+
+def HistoGausFit(h):
+    rms = h.GetRMS()
+    mean = h.GetMean()
+    y_max = h.GetMaximum()
+    x_range = ( mean - float(rms*4)/2 , mean + float(rms*4)/2 )
+    
+    g = ROOT.TF1("GausFit "+h.GetTitle(),"gaus",x_range[0],x_range[1])
+
+    # g.SetParameter(0,y_max)
+    # g.SetParameter(1,mean)
+    # g.SetParameter(2,rms)
+    g.SetLineColor(ROOT.kBlack)#h.GetLineColor()+1)
+    g.SetLineStyle(7)
+    g.SetLineStyle(h.GetLineWidth())
+
+    h.Fit(g,"R")
+
+    A,mu,sigma = g.GetParameter(0),g.GetParameter(1),g.GetParameter(2)
+    #print(f"{h.GetTitle()} fit resutl:\n\tA = {A}\n\tmu = {mu}\n\tsigma = {sigma}")
+    return g,A,mu,sigma
+
+
+if __name__ == '__main__':
+    ROOT.gROOT.SetBatch(True)
+    print(files_in_folder("357479_Prompt"))
+    # fn = "Aggregate.root"
+    # openFile = ROOT.TFile("Aggregate.root","update")
+    # mp=Map_TFile(fn)
+    # for s in range(1,6):
+    #     h = mp[fn][1]["ResidualCLS"][1][f"Residuals ClusterSize{s}"][0]
+    #     g,_,_,_ = HistoGausFit(h)
+    
+    #     writeToTFile(openFile,g,"ResidualCLS",True)    
+    #     openFile.Write("",ROOT.TObject.kOverwrite)
+#    input()
+    
