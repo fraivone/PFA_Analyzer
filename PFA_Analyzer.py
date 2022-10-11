@@ -114,9 +114,11 @@ DLE_ErrPhi = ROOT.TH1F("DLE_ErrPhi","DLE_ErrPhi",100,0,0.0025)
 DLE_ErrR = ROOT.TH1F("DLE_ErrR","DLE_ErrR",100,0,5)
 DLE_pt = ROOT.TH1F("pT of STA muons used to probe DLE","pT of STA muons used to probe DLE",200,0,100)
 
-TH1Fresidual_collector = generate1DResidualContainer(matching_variables,TH1nbins,ResidualCutOff)
+TH1Fresidual_collector_x = generate1DxResidualContainer(matching_variables,TH1nbins,ResidualCutOff)
+TH1Fresidual_collector_y = generate1DyResidualContainer(matching_variables,TH1nbins,ResidualCutOff)
 TH1FpropError_collector = generatePropagationErrorContainer(maxErrOnPropR, maxErrOnPropPhi)
 TH2Fresidual_collector = generate2DResidualContainer(matching_variables,TH2nbins,TH2min)  
+TH2FexcludedProphits_collector = generate2DMap_ExcludedHits(TH2nbins,TH2min)  
 THSanityChecks = {'Occupancy':{}, 
                   'NHits':{},
                   'PropagationError':{},
@@ -170,11 +172,9 @@ TH1MetaData['ExclusionSummaryCanvas']=setUpCanvas("ChamberMask_Summary",1200,120
 
 
 THAll_Residuals = {}
-THAll_Residuals[1] = ROOT.TH1F("Residual CLS 1","Residual CLS 1",TH1nbins,-ResidualCutOff["glb_rdphi"],ResidualCutOff["glb_rdphi"])
-THAll_Residuals[2] = ROOT.TH1F("Residual CLS 2","Residual CLS 2",TH1nbins,-ResidualCutOff["glb_rdphi"],ResidualCutOff["glb_rdphi"])
-THAll_Residuals[3] = ROOT.TH1F("Residual CLS 3","Residual CLS 3",TH1nbins,-ResidualCutOff["glb_rdphi"],ResidualCutOff["glb_rdphi"])
-THAll_Residuals[4] = ROOT.TH1F("Residual CLS 4","Residual CLS 4",TH1nbins,-ResidualCutOff["glb_rdphi"],ResidualCutOff["glb_rdphi"])
-THAll_Residuals[5] = ROOT.TH1F("Residual CLS 5","Residual CLS 5",TH1nbins,-ResidualCutOff["glb_rdphi"],ResidualCutOff["glb_rdphi"])
+for cls in range(1,6):
+    THAll_Residuals[cls] = ROOT.TH1F(f"Residual CLS {cls}",f"Residual CLS {cls}",TH1nbins,-ResidualCutOff["glb_rdphi"],ResidualCutOff["glb_rdphi"])
+
 
 THSanityChecks['NHits']['BeforeMatching'] = {'PerEVT':{'Reco':ROOT.TH1F("NRecoHitsPerEVT","NRecoHitsPerEVT",200,0,200),'Prop':ROOT.TH1F("NPropHitsPerEVT","NPropHitsPerEVT",20,0,20)},
                                              'ML1':ROOT.TH1F("ML1_NRecoHitsPerEVT","ML1_NRecoHitsPerEVT",200,0,200),
@@ -310,7 +310,7 @@ for fl in files:
 chain.SetBranchStatus("*",0);     
 
 
-branchList=["event_eventNumber","event_lumiBlock","event_runNumber","gemRecHit_region", "gemRecHit_chamber", "gemRecHit_layer", "gemRecHit_etaPartition", "gemRecHit_g_r", "gemRecHit_loc_x", "gemRecHit_g_x", "gemRecHit_g_y", "gemRecHit_g_z", "gemRecHit_g_phi", "gemRecHit_firstClusterStrip", "gemRecHit_cluster_size", "mu_propagated_region", "mu_propagated_chamber", "mu_propagated_layer", "mu_propagated_etaP", "mu_propagated_Outermost_z",  "mu_propagated_isME11", "mu_propagatedGlb_r", "mu_propagatedLoc_x", "mu_propagatedLoc_y", "mu_propagatedGlb_x", "mu_propagatedGlb_y", "mu_propagatedGlb_z", "mu_propagatedGlb_phi", "mu_propagatedGlb_errR", "mu_propagatedGlb_errPhi", "mu_propagatedLoc_dirX", "mu_propagatedLoc_dirY", "mu_propagatedLoc_dirZ", "mu_propagated_pt", "mu_propagated_isGEM", "mu_propagated_TrackNormChi2", "mu_propagated_nME1hits", "mu_propagated_nME2hits", "mu_propagated_nME3hits", "mu_propagated_nME4hits"]#,"mu_propagated_ME11Chamber","mu_propagated_ME11Endcap"]
+branchList=["event_eventNumber","event_lumiBlock","event_runNumber","gemRecHit_region", "gemRecHit_chamber", "gemRecHit_layer", "gemRecHit_etaPartition", "gemRecHit_g_r", "gemRecHit_loc_x", "gemRecHit_loc_y", "gemRecHit_g_x", "gemRecHit_g_y", "gemRecHit_g_z", "gemRecHit_g_phi", "gemRecHit_firstClusterStrip", "gemRecHit_cluster_size", "mu_propagated_region", "mu_propagated_chamber", "mu_propagated_layer", "mu_propagated_etaP", "mu_propagated_Outermost_z",  "mu_propagated_isME11", "mu_propagatedGlb_r", "mu_propagatedLoc_x", "mu_propagatedLoc_y", "mu_propagatedGlb_x", "mu_propagatedGlb_y", "mu_propagatedGlb_z", "mu_propagatedGlb_phi", "mu_propagatedGlb_errR", "mu_propagatedGlb_errPhi", "mu_propagatedLoc_dirX", "mu_propagatedLoc_dirY", "mu_propagatedLoc_dirZ", "mu_propagated_pt", "mu_propagated_isGEM", "mu_propagated_TrackNormChi2", "mu_propagated_nME1hits", "mu_propagated_nME2hits", "mu_propagated_nME3hits", "mu_propagated_nME4hits"]#,"mu_propagated_ME11Chamber","mu_propagated_ME11Endcap"]
 
 # 2. Enabling the useful ones
 for b in branchList:
@@ -377,6 +377,7 @@ for chain_index,evt in enumerate(chain):
 
         rec_glb_r = evt.gemRecHit_g_r[RecHit_index]
         rec_loc_x = evt.gemRecHit_loc_x[RecHit_index]
+        rec_loc_y = evt.gemRecHit_loc_y[RecHit_index]
 
         if RecHitEtaPartitionID in VFATOFFDict:
             if propHit2VFAT(rec_glb_r,rec_loc_x,etaP,region,chamber) in VFATOFFDict[RecHitEtaPartitionID]:
@@ -393,8 +394,9 @@ for chain_index,evt in enumerate(chain):
             else:
                 ML2_NGEMRecoHits += 1 
 
-        RecHit_Dict.setdefault(RecHitEtaPartitionID, {'loc_x':[],'glb_x':[],'glb_y':[],'glb_z':[],'glb_r':[],'glb_phi':[],'firstStrip':[],'cluster_size':[]})
+        RecHit_Dict.setdefault(RecHitEtaPartitionID, {'loc_x':[],'loc_y':[],'glb_x':[],'glb_y':[],'glb_z':[],'glb_r':[],'glb_phi':[],'firstStrip':[],'cluster_size':[]})
         RecHit_Dict[RecHitEtaPartitionID]['loc_x'].append(rec_loc_x)
+        RecHit_Dict[RecHitEtaPartitionID]['loc_y'].append(rec_loc_y)
         RecHit_Dict[RecHitEtaPartitionID]['glb_x'].append(evt.gemRecHit_g_x[RecHit_index])
         RecHit_Dict[RecHitEtaPartitionID]['glb_y'].append(evt.gemRecHit_g_y[RecHit_index])
         RecHit_Dict[RecHitEtaPartitionID]['glb_z'].append(evt.gemRecHit_g_z[RecHit_index])
@@ -541,7 +543,9 @@ for chain_index,evt in enumerate(chain):
         passedCutProp = {key:[] for key in PropHitonEta.keys()}
         ## Applying cuts on the propagated tracks to be used
         for index in range(nPropHitsOnEtaID):
-            if fiducialCut and passCut(PropHitonEta,etaPartitionID,index,maxPropR_Err=maxErrOnPropR,maxPropPhi_Err=maxErrOnPropPhi,fiducialCutR=fiducialR,fiducialCutPhi=fiducialPhi,minPt=CutminPt,maxChi2=maxSTA_NormChi2,minME1Hit=minME1Hit,minME2Hit=minME2Hit,minME3Hit=minME3Hit,minME4Hit=minME4Hit) == False:
+            cutPassed = passCut(PropHitonEta,etaPartitionID,index,maxPropR_Err=maxErrOnPropR,maxPropPhi_Err=maxErrOnPropPhi,fiducialCutR=fiducialR,fiducialCutPhi=fiducialPhi,minPt=CutminPt,maxChi2=maxSTA_NormChi2,minME1Hit=minME1Hit,minME2Hit=minME2Hit,minME3Hit=minME3Hit,minME4Hit=minME4Hit)
+            if fiducialCut and cutPassed != True:
+                TH2FexcludedProphits_collector = FillExcludedHits( TH2FexcludedProphits_collector, PropHitonEta, index, current_chamber_ID, cutPassed)
                 isGoodTrack.append(False)
             else:
                 EfficiencyDictGlobal['glb_phi'][etaPartitionID][pt_index(PropHitonEta['pt'][index])]['den'] += 1
@@ -673,7 +677,7 @@ for chain_index,evt in enumerate(chain):
             
             glb_phi_residual = PropHitonEta['glb_phi'][prop_hit_index] - RecHitonEta['glb_phi'][reco_hit_index]
             glb_rdphi_residual = (PropHitonEta['glb_phi'][prop_hit_index] - RecHitonEta['glb_phi'][reco_hit_index])*PropHitonEta['glb_r'][prop_hit_index]
-            loc_x_residual = PropHitonEta['loc_x'][prop_hit_index] - RecHitonEta['loc_x'][reco_hit_index]
+            loc_y_residual = PropHitonEta['loc_y'][prop_hit_index] - RecHitonEta['loc_y'][reco_hit_index]
             propagation_error_phi = PropHitonEta['err_glb_phi'][prop_hit_index]
             propagation_error_r = PropHitonEta['err_glb_r'][prop_hit_index]
 
@@ -698,11 +702,15 @@ for chain_index,evt in enumerate(chain):
                     TH1FpropError_collector["MatchedHits"][endcapTag][current_chamber_ID][eta]["ErrPhi"].Fill(propagation_error_phi)
                     TH1FpropError_collector["MatchedHits"][endcapTag][current_chamber_ID]["All"]["ErrR"].Fill(propagation_error_r)
                     TH1FpropError_collector["MatchedHits"][endcapTag][current_chamber_ID][eta]["ErrR"].Fill(propagation_error_r)
-                    TH1Fresidual_collector[matchingVar][endcapTag][current_chamber_ID]["All"]["Residual"].Fill(glb_rdphi_residual)
-                    TH1Fresidual_collector[matchingVar][endcapTag][current_chamber_ID][eta]["Residual"].Fill(glb_rdphi_residual)
+                    TH1Fresidual_collector_x[matchingVar][endcapTag][current_chamber_ID]["All"]["Residual"].Fill(glb_rdphi_residual)
+                    TH1Fresidual_collector_x[matchingVar][endcapTag][current_chamber_ID][eta]["Residual"].Fill(glb_rdphi_residual)
+                    TH1Fresidual_collector_y[matchingVar][endcapTag][current_chamber_ID][eta]["Residual"].Fill(loc_y_residual)
+                    TH1Fresidual_collector_y[matchingVar][endcapTag][current_chamber_ID]["All"]["Residual"].Fill(loc_y_residual)
                 else:
-                    TH1Fresidual_collector[matchingVar][endcapTag][current_chamber_ID]["All"]["Residual"].Fill(glb_phi_residual)
-                    TH1Fresidual_collector[matchingVar][endcapTag][current_chamber_ID][eta]["Residual"].Fill(glb_phi_residual)
+                    TH1Fresidual_collector_x[matchingVar][endcapTag][current_chamber_ID]["All"]["Residual"].Fill(glb_phi_residual)
+                    TH1Fresidual_collector_x[matchingVar][endcapTag][current_chamber_ID][eta]["Residual"].Fill(glb_phi_residual)
+                    TH1Fresidual_collector_y[matchingVar][endcapTag][current_chamber_ID][eta]["Residual"].Fill(loc_y_residual)
+                    TH1Fresidual_collector_y[matchingVar][endcapTag][current_chamber_ID]["All"]["Residual"].Fill(loc_y_residual)
 
                 binx = int(round((PropHitonEta['loc_x'][prop_hit_index]-TH2min)*(TH2nbins-1)/(-2*TH2min)))+1
                 biny = int(round((PropHitonEta['loc_y'][prop_hit_index]-TH2min)*(TH2nbins-1)/(-2*TH2min)))+1
@@ -925,6 +933,10 @@ for when in ["beforematching","aftermatching"]:
                 for eta in list(range(1,9))+ ["All"]:
                     writeToTFile(OutF,THSanityChecks['CLS'][when][ch_id][eta],f"SanityChecks/CLS/{when}/{endcapTag}/{ch_id}")
 
+for chsize,value in TH2FexcludedProphits_collector.items():
+    for exclusion_key, histo in value.items():
+        writeToTFile(OutF,histo,"SanityChecks/ExcludedPropagateHits/"+chsize+"/")
+
 for matchingVar in matching_variables:
     for chambers in ['all','long','short']:
         writeToTFile(OutF,TH2Fresidual_collector[matchingVar][chambers]['glb_phi']['TH2F'],"Residuals/MatchingOn_"+matchingVar+"/2D_glb_phi")
@@ -1024,7 +1036,8 @@ for matchingVar in matching_variables:
                 writeToTFile(OutF,generate1DEfficiencyPlotbyVFAT(EfficiencyDictVFAT[matchingVar],current_chamber_ID),"Efficiency/"+matchingVar+"/ByVFAT/"+endcapTag+"/"+current_chamber_ID)
                 for t_eta in list(range(1,9)) + ["All"]:
                     writeToTFile(OutF,THSanityChecks['pt'][current_chamber_ID][t_eta],"SanityChecks/pt/"+endcapTag+"/"+current_chamber_ID)
-                    writeToTFile(OutF,TH1Fresidual_collector[matchingVar][endcapTag][current_chamber_ID][t_eta]["Residual"],"Residuals/MatchingOn_"+matchingVar+"/"+endcapTag+"/"+current_chamber_ID+"/Residual")
+                    writeToTFile(OutF,TH1Fresidual_collector_x[matchingVar][endcapTag][current_chamber_ID][t_eta]["Residual"],"Residuals/MatchingOn_"+matchingVar+"/"+endcapTag+"/"+current_chamber_ID+"/Residualx")
+                    writeToTFile(OutF,TH1Fresidual_collector_y[matchingVar][endcapTag][current_chamber_ID][t_eta]["Residual"],"Residuals/MatchingOn_"+matchingVar+"/"+endcapTag+"/"+current_chamber_ID+"/Residualy")
                     writeToTFile(OutF,TH1FpropError_collector["AllHits"][endcapTag][current_chamber_ID][t_eta]["ErrPhi"],"Residuals/MatchingOn_"+matchingVar+"/"+endcapTag+"/"+current_chamber_ID+"/PropagationError/AllHits")
                     writeToTFile(OutF,TH1FpropError_collector["AllHits"][endcapTag][current_chamber_ID][t_eta]["ErrR"],"Residuals/MatchingOn_"+matchingVar+"/"+endcapTag+"/"+current_chamber_ID+"/PropagationError/AllHits")
 
