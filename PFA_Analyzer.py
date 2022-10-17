@@ -39,6 +39,7 @@ parser.add_argument('--minME2', type=int, help="Min number of ME2 hits",required
 parser.add_argument('--minME3', type=int, help="Min number of ME3 hits",required=False)
 parser.add_argument('--minME4', type=int, help="Min number of ME4 hits",required=False)
 parser.add_argument('-evts','--nevents', type=int,help="Maximum allowed dphi between RecoHit and PropHit to be counted as matched hit",required=False)
+parser.add_argument('-ls','--lumisection',nargs=2, type=int,help="Lumisection interval to be analyzed in the format --lumisection min_L max_L",required=False)
 
 parser.set_defaults(phi_cut=0.001)
 parser.set_defaults(rdphi_cut=0.15)
@@ -54,6 +55,7 @@ parser.set_defaults(maxErrPropR=1)
 parser.set_defaults(maxErrPropPhi=0.005)
 parser.set_defaults(outputname=time.strftime("%-y%m%d_%H%M"))
 parser.set_defaults(nevents=-1)
+parser.set_defaults(lumisection=None)
 args = parser.parse_args()
 
 chamberForEventDisplay = ["GE11-P-28L2-L"]
@@ -91,6 +93,9 @@ minME2Hit = args.minME2
 minME3Hit = args.minME3
 minME4Hit = args.minME4
 outputname = args.outputname
+if args.lumisection != None:
+    LS_start = min(args.lumisection)
+    LS_stop = max(args.lumisection)
 
 noisyEtaPID = []
 VFATOFFDict = {} if args.VFATOFF is None else importOFFVFAT(args.VFATOFF)
@@ -342,9 +347,8 @@ for chain_index,evt in enumerate(chain):
     LumiSection = evt.event_lumiBlock
     maxLS = max(maxLS,LumiSection)
     RunNumber = evt.event_runNumber
-    
-
-    
+    if args.lumisection != None and (LumiSection < LS_start or LumiSection > LS_stop):
+        continue    
 
     # If FullDigis == True, never skip evts
     # If FullDigis == False, skip evts with 0 propagations
