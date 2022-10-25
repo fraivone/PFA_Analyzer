@@ -6,99 +6,43 @@ import numpy as np
 import time
 import argparse
 import pandas as pd
-from argparse import RawTextHelpFormatter
 from ROOT_Utils import *
 from PFA_Analyzer_Utils import *
-
+import logging 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-parser = argparse.ArgumentParser(
-        description='''Scripts that: \n\t-Reads the GEMMuonNtuple\n\t-Plot Sanity Checks\n\t-Plot Residuals (takes the cut as parameter)\n\t-Plot efficiency\nCurrently allows the hits matching on glb_phi and glb_rdphi''',
-        epilog="""Typical exectuion\n\t python PFA_Analyzer.py  --phi_cut 0.001 --rdphi_cut 0.15""",
-        formatter_class=RawTextHelpFormatter
-)
+logging.basicConfig(format='[{asctime}] {levelname} - {message}', datefmt='%B %d - %H:%M:%S',level=logging.DEBUG,style="{")
+logging.addLevelName( logging.DEBUG, "\033[1;90m%s\033[1;0m" % logging.getLevelName(logging.DEBUG))
+logging.addLevelName( logging.INFO, "\033[1;92m%s\033[1;0m" % logging.getLevelName(logging.INFO))
+logging.addLevelName( logging.WARNING, "\033[1;93m%s\033[1;0m" % logging.getLevelName(logging.WARNING))
+logging.addLevelName( logging.ERROR, "\033[1;31m%s\033[1;0m" % logging.getLevelName(logging.ERROR))
 
-parser.add_argument('-pc','--phi_cut', type=float,help="Maximum allowed dphi between RecoHit and PropHit to be counted as matched hit",required=False)
-parser.add_argument('-rdpc','--rdphi_cut', type=float,help="Maximum allowed rdphi between RecoHit and PropHit to be counted as matched hit",required=False)
-parser.add_argument('--chi2cut', type=float,help="Maximum normalized chi2 for which accept propagated tracks",required=False)
-parser.add_argument('--minPt', type=float,help="Minimum pt for which accept propagated tracks",required=False)
-parser.add_argument('--chamberOFF', type=str , help="file_path to the file containing a list of the chambers you want to exclude for the run (i.e. GE11-M-29L2)",required=False,nargs='*')
-parser.add_argument('--VFATOFF', type=str , help="file_path to the file containing a list of the VFAT you want to exclude from efficiency evaluation. The file must be tab separated with \tregion,layer,chamber,VFAT,reason_mask",required=False,nargs='*')
-parser.add_argument('--outputname', type=str, help="output file name",required=False)
-parser.add_argument('--fiducialR','-fR', type=float , help="fiducial cut along R axis",required=False)
-parser.add_argument('--fiducialPhi','-fP', type=float , help="fiducial cut along phi axis",required=False)
-parser.add_argument('--maxErrPropR', type=float , help="max error on propagated R in order to accept the muon (cm)",required=False)
-parser.add_argument('--maxErrPropPhi', type=float , help="max error on propagated phi in order to accept the muon (rad)",required=False)
-parser.add_argument('--DLE', default=False, action='store_true',help="Swtiches on the Double Layer Efficiency (DLE) analisys. False by default",required=False)
-parser.add_argument('--FD', default=False, action='store_true',help="When enabled, allows the storage of all GEM RecHit Digis. False by default, which means that GEM RecHit Digis are stored only for EVTs in which STA propagation hits GEM",required=False)
-parser.add_argument('--verbose', default=False, action='store_true',help="Verbose printing",required=False)
-parser.add_argument('--dataset','-ds', type=str,help="TAG to the folder containing the NTuples to be analyzed",required=True,nargs='*')
-
-parser.add_argument('--minME1', type=int, help="Min number of ME1 hits",required=False)
-parser.add_argument('--minME2', type=int, help="Min number of ME2 hits",required=False)
-parser.add_argument('--minME3', type=int, help="Min number of ME3 hits",required=False)
-parser.add_argument('--minME4', type=int, help="Min number of ME4 hits",required=False)
-parser.add_argument('-evts','--nevents', type=int,help="Maximum allowed dphi between RecoHit and PropHit to be counted as matched hit",required=False)
-
-parser.set_defaults(phi_cut=0.001)
-parser.set_defaults(rdphi_cut=0.15)
-parser.set_defaults(chi2cut=9999999)
-parser.set_defaults(minPt=0)
-parser.set_defaults(minME1=0)
-parser.set_defaults(minME2=0)
-parser.set_defaults(minME3=0)
-parser.set_defaults(minME4=0)
-parser.set_defaults(fiducialR=1)
-parser.set_defaults(fiducialPhi=0.005)
-parser.set_defaults(maxErrPropR=1)
-parser.set_defaults(maxErrPropPhi=0.005)
-parser.set_defaults(outputname=time.strftime("%-y%m%d_%H%M"))
-parser.set_defaults(nevents=-1)
+parser = argparse.ArgumentParser(description='PFA Analyzer parser')
+parser.add_argument('config', help='Analysis description file')
 args = parser.parse_args()
 
+start_time = time.time()
 chamberForEventDisplay = ["GE11-P-28L2-L"]
-
+data_ranges,parameters = load_config(os.path.abspath(args.config))
+TH1MetaData = GenerateMetadata(parameters,data_ranges)
 
 ROOT.gROOT.SetBatch(True)
 ROOT.gStyle.SetLineScalePS(1)
-if not args.verbose: ROOT.gROOT.ProcessLine("gErrorIgnoreLevel=2001;") #suppressed everything less-than-or-equal-to kWarning
-
-
-
-start_time = time.time()
+if not parameters["verbose"]: ROOT.gROOT.ProcessLine("gErrorIgnoreLevel=2001;") #suppressed everything less-than-or-equal-to kWarning
 
 files = []
-
-
-for folder in args.dataset:
-    files = files + files_in_folder(folder)
+for run in data_ranges:
+    run_tag  = data_ranges[run]["tag"]
+    file_tag  = data_ranges[run]["file_tag"]
+    files = files + files_in_folder(run_tag,filename_tag=file_tag)
 
 matching_variables = ['glb_phi','glb_rdphi']
 matching_variable_units = {'glb_phi':'rad','glb_rdphi':'cm'}
-ResidualCutOff= {'glb_phi':args.phi_cut,'glb_rdphi':args.rdphi_cut}
-
-DLE = args.DLE
-FD = args.FD
-fiducialCut = True
-maxErrOnPropR = args.maxErrPropR
-maxErrOnPropPhi = args.maxErrPropPhi
-fiducialR = args.fiducialR
-fiducialPhi = args.fiducialPhi
-CutminPt = args.minPt
-maxSTA_NormChi2 = args.chi2cut
-minME1Hit = args.minME1
-minME2Hit = args.minME2
-minME3Hit = args.minME3
-minME4Hit = args.minME4
-outputname = args.outputname
-
-noisyEtaPID = []
-VFATOFFDict = {} if args.VFATOFF is None else importOFFVFAT(args.VFATOFF)
-chamberOFFLS = {} if args.chamberOFF is None else ChamberOFF_byLS(args.chamberOFF)
+ResidualCutOff = {'glb_phi':parameters["phi_cut"],'glb_rdphi':parameters["rdphi_cut"]}
 
 TH1nbins = 120
 TH2nbins = 200
-TH2min = -80
+TH2min = -130
 
 EfficiencyDictGlobal = dict((m,{}) for m in matching_variables)
 EfficiencyDictVFAT = generateVFATDict(matching_variables)
@@ -116,7 +60,7 @@ DLE_pt = ROOT.TH1F("pT of STA muons used to probe DLE","pT of STA muons used to 
 
 TH1Fresidual_collector_x = generate1DxResidualContainer(matching_variables,TH1nbins,ResidualCutOff)
 TH1Fresidual_collector_y = generate1DyResidualContainer(matching_variables,TH1nbins,ResidualCutOff)
-TH1FpropError_collector = generatePropagationErrorContainer(maxErrOnPropR, maxErrOnPropPhi)
+TH1FpropError_collector = generatePropagationErrorContainer(parameters["maxErrPropR"], parameters["maxErrPropPhi"])
 TH2Fresidual_collector = generate2DResidualContainer(matching_variables,TH2nbins,TH2min)  
 TH2FexcludedProphits_collector = generate2DMap_ExcludedHits(TH2nbins,TH2min)  
 THSanityChecks = {'Occupancy':{}, 
@@ -132,44 +76,6 @@ THSanityChecks = {'Occupancy':{},
                   'CLS':{'beforematching':{},'aftermatching':{}},
                   'pt':{'glb_phi':{},'glb_rdphi':{},'All':ROOT.TH1F("pT of STA muons used to probe efficiency","pT of STA muons used to probe efficiency",200,0,100)}
                 }   
-                
-
-TH1MetaData = { 'isFiducialCut':[],
-                'PropRErr':[],
-                'PropPhiErr':[],
-                'fiducialR':[],
-                'fiucialPhi':[],
-                'glb_phi':[],
-                'glb_rdphi':[],
-                'pt':[],
-                'maxSTA_NormChi2':[],
-                'minME1Hit':[],
-                'minME2Hit':[],
-                'minME3Hit':[],
-                'minME4Hit':[]}
-
-## Initialize Collectors
-
-for key in TH1MetaData.keys():
-    TH1MetaData[key] = ROOT.TH1F("CUT_on_"+key,"CUT_on_"+key,10,1,1)
-
-TH1MetaData['isFiducialCut'].Fill(fiducialCut)
-TH1MetaData['PropRErr'].Fill(maxErrOnPropR)
-TH1MetaData['PropPhiErr'].Fill(maxErrOnPropPhi)
-TH1MetaData['fiducialR'].Fill(fiducialR)
-TH1MetaData['fiucialPhi'].Fill(fiducialPhi)
-TH1MetaData['glb_phi'].Fill(ResidualCutOff['glb_phi'])
-TH1MetaData['glb_rdphi'].Fill(ResidualCutOff['glb_rdphi'])
-TH1MetaData['pt'].Fill(CutminPt)
-TH1MetaData['maxSTA_NormChi2'].Fill(maxSTA_NormChi2)
-TH1MetaData['minME1Hit'].Fill(minME1Hit)
-TH1MetaData['minME2Hit'].Fill(minME2Hit)
-TH1MetaData['minME3Hit'].Fill(minME3Hit)
-TH1MetaData['minME4Hit'].Fill(minME4Hit)
-TH1MetaData['chamberOFFCanvas']=setUpCanvas("ChamberOFF_byLS",1200,1200)
-TH1MetaData['VFATOFFCanvas']=setUpCanvas("ExcludedVFAT",1200,1200)
-TH1MetaData['ExclusionSummaryCanvas']=setUpCanvas("ChamberMask_Summary",1200,1200)
-
 
 THAll_Residuals = {}
 for cls in range(1,6):
@@ -293,63 +199,50 @@ for key_1 in ['Long','Short']:
         THSanityChecks['PropHit_DirLoc_xOnGE11']['BeforeMatching'][key_1][key_2] = ROOT.TH1F('BeforeMatchPropHit_DirLoc_xOnGE11_'+key_1+key_2,'BeforeMatchPropHit_DirLoc_xOnGE11_'+key_1+key_2,200,-1,1)
         THSanityChecks['PropHit_DirLoc_xOnGE11']['AfterMatching'][key_1][key_2] = ROOT.TH1F('AfterMatchPropHit_DirLoc_xOnGE11_'+key_1+key_2,'AfterMatchPropHit_DirLoc_xOnGE11_'+key_1+key_2,200,-1,1)
 
-# matchingFile = ROOT.TFile("./Output/PFA_Analyzer_Output/ROOT_File/MatchingTree_"+outputname+".root","RECREATE")
-# tree_out,generalMatching,recHit_Matching,propHit_Matching = initializeMatchingTree()
 
 ## Chain files
 chain = ROOT.TChain("muNtupleProducer/MuDPGTree")
-
-print(f"{args.dataset} TChaining {len(files)} files...")
-#print'\n'.join(files)
-print(f"Found {len(files)} files")
-print()
+logging.info(f"TChaining {len(files)} files...")
 for fl in files:
     chain.Add(fl)
-## Enabling only the branches which are actually in use
-# 1. Disabling them all
-chain.SetBranchStatus("*",0);     
 
+# Disabling them all branches
+chain.SetBranchStatus("*",0)
+branchList=["event_eventNumber","event_lumiBlock","event_runNumber","gemRecHit_region", "gemRecHit_chamber", "gemRecHit_layer", "gemRecHit_etaPartition", "gemRecHit_g_r", "gemRecHit_loc_x", "gemRecHit_loc_y", "gemRecHit_g_x", "gemRecHit_g_y", "gemRecHit_g_z", "gemRecHit_g_phi", "gemRecHit_firstClusterStrip", "gemRecHit_cluster_size", "mu_propagated_region", "mu_propagated_chamber", "mu_propagated_layer", "mu_propagated_etaP", "mu_propagated_Outermost_z",  "mu_propagated_isME11", "mu_propagatedGlb_r", "mu_propagatedLoc_x", "mu_propagatedLoc_y", "mu_propagatedGlb_x", "mu_propagatedGlb_y", "mu_propagatedGlb_z", "mu_propagatedGlb_phi", "mu_propagatedGlb_errR", "mu_propagatedGlb_errPhi", "mu_propagatedLoc_dirX", "mu_propagatedLoc_dirY", "mu_propagatedLoc_dirZ", "mu_propagated_pt", "mu_propagated_isGEM", "mu_propagated_TrackNormChi2", "mu_propagated_nME1hits", "mu_propagated_nME2hits", "mu_propagated_nME3hits", "mu_propagated_nME4hits","mu_propagated_station","gemRecHit_station","mu_propagated_isME21"]#,"mu_propagated_ME11Chamber","mu_propagated_ME11Endcap"]
+# Enabling the useful ones
+for b in branchList: chain.SetBranchStatus(b,1)
 
-branchList=["event_eventNumber","event_lumiBlock","event_runNumber","gemRecHit_region", "gemRecHit_chamber", "gemRecHit_layer", "gemRecHit_etaPartition", "gemRecHit_g_r", "gemRecHit_loc_x", "gemRecHit_loc_y", "gemRecHit_g_x", "gemRecHit_g_y", "gemRecHit_g_z", "gemRecHit_g_phi", "gemRecHit_firstClusterStrip", "gemRecHit_cluster_size", "mu_propagated_region", "mu_propagated_chamber", "mu_propagated_layer", "mu_propagated_etaP", "mu_propagated_Outermost_z",  "mu_propagated_isME11", "mu_propagatedGlb_r", "mu_propagatedLoc_x", "mu_propagatedLoc_y", "mu_propagatedGlb_x", "mu_propagatedGlb_y", "mu_propagatedGlb_z", "mu_propagatedGlb_phi", "mu_propagatedGlb_errR", "mu_propagatedGlb_errPhi", "mu_propagatedLoc_dirX", "mu_propagatedLoc_dirY", "mu_propagatedLoc_dirZ", "mu_propagated_pt", "mu_propagated_isGEM", "mu_propagated_TrackNormChi2", "mu_propagated_nME1hits", "mu_propagated_nME2hits", "mu_propagated_nME3hits", "mu_propagated_nME4hits"]#,"mu_propagated_ME11Chamber","mu_propagated_ME11Endcap"]
-
-# 2. Enabling the useful ones
-for b in branchList:
-    chain.SetBranchStatus(b,1)
-
-
+maxLS = {}
 chainEntries = chain.GetEntries()
-maxLS = 0
-print("\n#############\nStarting\n#############")
-
-try:
-    print(f"Analysing run(s): \t { [int(GetRunNumber(i)) for i in args.dataset] }")
-except:
-    pass
-millions_of_evts = float(chainEntries)/10**6
-print(f"Number of evts \t\t {millions_of_evts:.2f} M\n")
+logging.info("############# Starting #############")
+logging.info(f"Analysing run(s): \t { [i for i in data_ranges] }")
+logging.info(f"Number of evts \t\t {float(chainEntries)/10**6:.2f} M\n")
 
 THSanityChecks['NEvts'].Fill(chainEntries)
 for chain_index,evt in enumerate(chain):
-    if chain_index > args.nevents and args.nevents > 0:
-        break
-    if chain_index % 4000 ==0:
-        pretty_formatted_date = time.strftime("%B %d - %H:%M:%S")
-        print(f"[{pretty_formatted_date}]\t{round(float(chain_index)/float(chainEntries),3)*100}%")
+    EventNumber = evt.event_eventNumber
+    LumiSection = evt.event_lumiBlock
+    RunNumber = evt.event_runNumber
+    
+    
+    if chain_index % 8000 ==0: logging.info(f"{round( float(chain_index)/chainEntries*100,1 )}%\t{chain_index}")
+    
     n_gemprop = len(evt.mu_propagated_chamber)
     n_gemrec = len(evt.gemRecHit_chamber)
     
-    EventNumber = evt.event_eventNumber
-    LumiSection = evt.event_lumiBlock
-    maxLS = max(maxLS,LumiSection)
-    RunNumber = evt.event_runNumber
-    
-
-    
-
-    # If FullDigis == True, never skip evts
-    # If FullDigis == False, skip evts with 0 propagations
-    if FD == False and n_gemprop==0:
+    ## Break on total number of evts
+    if chain_index > data_ranges[RunNumber]["nevts"] and data_ranges[RunNumber]["nevts"]> 0:
+        logging.debug(f"Exiting after reaching max number of events: {data_ranges[RunNumber]['nevts']}")
+        break
+    ## Skip on LS
+    if data_ranges[RunNumber]["lumisection"] != (0,0) and (LumiSection < data_ranges[RunNumber]["lumisection"][0] or LumiSection > data_ranges[RunNumber]["lumisection"][1]):
+        logging.debug(f"Skipping, LS is {LumiSection} while range is {data_ranges[RunNumber]['lumisection']}")
         continue
+    # If not FullDigis, skip evts with 0 propagations
+    if parameters["FD"] == False and n_gemprop==0:
+        continue
+
+    maxLS[RunNumber] = LumiSection if maxLS.get(RunNumber) is None else max(maxLS.get(RunNumber),LumiSection)
 
     THSanityChecks['NHits']['BeforeMatching']['PerEVT']['Prop'].Fill(n_gemprop)
     THSanityChecks['NHits']['BeforeMatching']['PerEVT']['Reco'].Fill(n_gemrec)
@@ -372,15 +265,15 @@ for chain_index,evt in enumerate(chain):
         chamberID = ReChLa2chamberName(region,chamber,layer)
         
         ## discard chambers that were kept OFF from the analysis
-        if chamberID in chamberOFFLS.keys() and (LumiSection in chamberOFFLS[chamberID] or -1 in chamberOFFLS[chamberID] ):
+        if chamberID in data_ranges[RunNumber]["chamberOFF"].keys() and (LumiSection in data_ranges[RunNumber]["chamberOFF"][chamberID] or -1 in data_ranges[RunNumber]["chamberOFF"][chamberID] ):
             continue
 
         rec_glb_r = evt.gemRecHit_g_r[RecHit_index]
         rec_loc_x = evt.gemRecHit_loc_x[RecHit_index]
         rec_loc_y = evt.gemRecHit_loc_y[RecHit_index]
 
-        if RecHitEtaPartitionID in VFATOFFDict:
-            if propHit2VFAT(rec_glb_r,rec_loc_x,etaP,region,chamber) in VFATOFFDict[RecHitEtaPartitionID]:
+        if RecHitEtaPartitionID in data_ranges[RunNumber]["VFATOFF"]:
+            if propHit2VFAT(rec_glb_r,rec_loc_x,etaP,region,chamber) in data_ranges[RunNumber]["VFATOFF"][RecHitEtaPartitionID]:
                 continue
 
         if region == 1:
@@ -444,7 +337,7 @@ for chain_index,evt in enumerate(chain):
 
         chamberID = ReChLa2chamberName(region,chamber,layer)
         ## discard chambers that were kept OFF from the analysis
-        if chamberID in chamberOFFLS.keys() and (LumiSection in chamberOFFLS[chamberID] or -1 in chamberOFFLS[chamberID] ):
+        if chamberID in data_ranges[RunNumber]["chamberOFF"].keys() and (LumiSection in data_ranges[RunNumber]["chamberOFF"][chamberID] or -1 in data_ranges[RunNumber]["chamberOFF"][chamberID] ):
             continue
 
         propHitFromME11 = bool(evt.mu_propagated_isME11[PropHit_index])
@@ -453,8 +346,8 @@ for chain_index,evt in enumerate(chain):
             prop_glb_r = evt.mu_propagatedGlb_r[PropHit_index]
             prop_loc_x = evt.mu_propagatedLoc_x[PropHit_index]
 
-            if PropHitChamberID in VFATOFFDict:
-                if propHit2VFAT(prop_glb_r,prop_loc_x,etaP,region,chamber) in VFATOFFDict[PropHitChamberID]:
+            if PropHitChamberID in data_ranges[RunNumber]["VFATOFF"]:
+                if propHit2VFAT(prop_glb_r,prop_loc_x,etaP,region,chamber) in data_ranges[RunNumber]["VFATOFF"][PropHitChamberID]:
                     continue
 
             
@@ -504,7 +397,7 @@ for chain_index,evt in enumerate(chain):
     ##      1.SAME REGION,SC,LAYER,ETA -->SAME etaPartitionID
     ##      When using DLE, only evts w/ exactly 2 PropHit in a SC: 1 hit per Layer with Delta(etaP) < 4
 
-    if DLE and (len(PropHit_Dict.keys()) != 2 or abs(PropHit_Dict.keys()[0] - PropHit_Dict.keys()[1] ) > 13) :
+    if parameters["DLE"] and (len(PropHit_Dict.keys()) != 2 or abs(PropHit_Dict.keys()[0] - PropHit_Dict.keys()[1] ) > 13) :
         continue
 
     layer1Match = False
@@ -543,8 +436,8 @@ for chain_index,evt in enumerate(chain):
         passedCutProp = {key:[] for key in PropHitonEta.keys()}
         ## Applying cuts on the propagated tracks to be used
         for index in range(nPropHitsOnEtaID):
-            cutPassed = passCut(PropHitonEta,etaPartitionID,index,maxPropR_Err=maxErrOnPropR,maxPropPhi_Err=maxErrOnPropPhi,fiducialCutR=fiducialR,fiducialCutPhi=fiducialPhi,minPt=CutminPt,maxChi2=maxSTA_NormChi2,minME1Hit=minME1Hit,minME2Hit=minME2Hit,minME3Hit=minME3Hit,minME4Hit=minME4Hit)
-            if fiducialCut and cutPassed != True:
+            cutPassed = passCut(PropHitonEta,etaPartitionID,index,maxPropR_Err=parameters["maxErrPropR"],maxPropPhi_Err=parameters["maxErrPropPhi"],fiducialCutR=parameters["fiducialR"],fiducialCutPhi=parameters["fiducialPhi"],minPt=parameters["minPt"],maxChi2=parameters["chi2cut"],minME1Hit=parameters["minME1"],minME2Hit=parameters["minME2"],minME3Hit=parameters["minME3"],minME4Hit=parameters["minME4"])
+            if parameters["fiducialCut"] and cutPassed != True:
                 TH2FexcludedProphits_collector = FillExcludedHits( TH2FexcludedProphits_collector, PropHitonEta, index, current_chamber_ID, cutPassed)
                 isGoodTrack.append(False)
             else:
@@ -570,7 +463,7 @@ for chain_index,evt in enumerate(chain):
     
         PropHitonEta = passedCutProp
         nGoodPropagation = len(PropHitonEta['glb_phi'])        
-        if DLE:    
+        if parameters["DLE"]:    
             if layer == 1:
                 layer1PassedCut = True
                 layer1etapID = etaPartitionID
@@ -773,7 +666,7 @@ for chain_index,evt in enumerate(chain):
 
     ## Double Layer Efficiency (DLE): test layer1(2) with tracks that have matched in layer1(2)
 
-    if DLE and layer2Match and layer1PassedCut and layer2PassedCut:
+    if parameters["DLE"] and layer2Match and layer1PassedCut and layer2PassedCut:
         EfficiencyDictLayer['glb_rdphi'][layer1etapID][pt_index(layer2pt)]['den'] += 1
         DLE_pt.Fill(layer2pt)
         # DLE_ErrPhi.Fill(PropHitonEta['err_glb_phi'][prop_hit_index])
@@ -782,7 +675,7 @@ for chain_index,evt in enumerate(chain):
         if layer1Match == True:
             EfficiencyDictLayer['glb_rdphi'][layer1etapID][pt_index(layer2pt)]['num'] += 1
 
-    if DLE and layer1Match and layer2PassedCut and layer1PassedCut:
+    if parameters["DLE"] and layer1Match and layer2PassedCut and layer1PassedCut:
         EfficiencyDictLayer['glb_rdphi'][layer2etapID][pt_index(layer1pt)]['den'] += 1
         DLE_pt.Fill(layer1pt)
         # DLE_ErrPhi.Fill(PropHitonEta['err_glb_phi'][prop_hit_index])
@@ -803,52 +696,51 @@ for chain_index,evt in enumerate(chain):
 
 TH2Fresidual_collector = fillPlot2DResidualContainer(TH2Fresidual_collector,matching_variables,TH2nbins)
 
-print(f"--- {(time.time() - start_time)} seconds ---")
+logging.info(f"--- {round(time.time() - start_time,2)} seconds ---")
 
 
 ## Storing the results
 # matchingFile.Write()
-OutF = ROOT.TFile("./Output/PFA_Analyzer_Output/ROOT_File/"+outputname+".root","RECREATE")
+OutF = ROOT.TFile("./Output/PFA_Analyzer_Output/ROOT_File/"+parameters["outputname"]+".root","RECREATE")
 
-subprocess.call(["mkdir", "-p", "./Output/PFA_Analyzer_Output/CSV/"+outputname])
-subprocess.call(["mkdir", "-p", "./Output/PFA_Analyzer_Output/CSV/"+outputname])
-subprocess.call(["mkdir", "-p", "./Output/PFA_Analyzer_Output/Plot/"+outputname+"/"+"glb_phi/"])
-subprocess.call(["mkdir", "-p", "./Output/PFA_Analyzer_Output/Plot/"+outputname+"/"+"glb_rdphi/"])
+subprocess.call(["mkdir", "-p", "./Output/PFA_Analyzer_Output/CSV/"+parameters["outputname"]])
+subprocess.call(["mkdir", "-p", "./Output/PFA_Analyzer_Output/CSV/"+parameters["outputname"]])
+subprocess.call(["mkdir", "-p", "./Output/PFA_Analyzer_Output/Plot/"+parameters["outputname"]+"/"+"glb_phi/"])
+subprocess.call(["mkdir", "-p", "./Output/PFA_Analyzer_Output/Plot/"+parameters["outputname"]+"/"+"glb_rdphi/"])
 
 
 ### Masking
-TH1MetaData['chamberOFFCanvas'].Divide(2,2)
-TH1MetaData['VFATOFFCanvas'].Divide(2,2)
-TH1MetaData['ExclusionSummaryCanvas'].Divide(2,2)
+for run in data_ranges:
+    data_ranges[run]["lumisection"] = (data_ranges[run]["lumisection"][0],maxLS[run])
+    masking_dict_key = [f'{run}_chamberOFF',f'{run}_VFATOFF',f'{run}_ExclusionSummary']
+    for k in masking_dict_key:
+        TH1MetaData[k]=setUpCanvas(k,1200,1200)
+        TH1MetaData[k].Divide(2,2)
 
-OFFChambers_plots = ChambersOFFHisto(chamberOFFLS,maxLS)
-for counter,plot in enumerate(OFFChambers_plots):
-    TH1MetaData['chamberOFFCanvas'].cd(counter+1)
-    plot.Draw()
+    OFFChambers_plots = ChambersOFFHisto(data_ranges[run]["chamberOFF"],data_ranges[run]["lumisection"][0],data_ranges[run]["lumisection"][1])
+    for counter,plot in enumerate(OFFChambers_plots):
+        TH1MetaData[f'{run}_chamberOFF'].cd(counter+1)
+        plot.Draw()
 
-OFFVFATs_plots = VFATOFFHisto(VFATOFFDict)
-for counter,plot in enumerate(OFFVFATs_plots):
-    TH1MetaData['VFATOFFCanvas'].cd(counter+1)
-    plot.Draw("COLZ")
+    OFFVFATs_plots = VFATOFFHisto(data_ranges[run]["VFATOFF"])
+    for counter,plot in enumerate(OFFVFATs_plots):
+        TH1MetaData[f'{run}_VFATOFF'].cd(counter+1)
+        plot.Draw("COLZ")
 
-GE11Discarded_plots = GE11DiscardedSummary(chamberOFFLS,maxLS,VFATOFFDict)
-for counter,plot in enumerate(GE11Discarded_plots):
-    TH1MetaData['ExclusionSummaryCanvas'].cd(counter+1)
-    plot.Draw("COLZ")
-    TH1MetaData['ExclusionSummaryCanvas'].cd(counter+1).Update()
-    palette = plot.GetListOfFunctions().FindObject("palette")
-    palette.SetX2NDC(0.93)
-    palette.Draw()
-setUpCanvas("GE11 Masked",1200,1200).cd()
+    GE11Discarded_plots = GE11DiscardedSummary(data_ranges[run]["chamberOFF"],data_ranges[run]["lumisection"][0],data_ranges[run]["lumisection"][1],data_ranges[run]["VFATOFF"])
+    for counter,plot in enumerate(GE11Discarded_plots):
+        TH1MetaData[f'{run}_ExclusionSummary'].cd(counter+1)
+        plot.Draw("COLZ")
+        TH1MetaData[f'{run}_ExclusionSummary'].cd(counter+1).Update()
+        palette = plot.GetListOfFunctions().FindObject("palette")
+        palette.SetX2NDC(0.93)
+        palette.Draw()
+    setUpCanvas("GE11 Masked",1200,1200).cd()
 
-TH1MetaData['chamberOFFCanvas'].Modified()
-TH1MetaData['chamberOFFCanvas'].Update()
-TH1MetaData['VFATOFFCanvas'].Modified()
-TH1MetaData['VFATOFFCanvas'].Update()
-TH1MetaData['ExclusionSummaryCanvas'].Modified()
-TH1MetaData['ExclusionSummaryCanvas'].Update()
-TH1MetaData['ExclusionSummaryCanvas'].SaveAs("./Output/PFA_Analyzer_Output/Plot/"+outputname+"/ExclusionCanvas.pdf")
-
+    for k in masking_dict_key:
+        TH1MetaData[k].Modified()
+        TH1MetaData[k].Update()
+    
 writeToTFile(OutF,THSanityChecks['NEvts'],"SanityChecks/NumberOfEVTs/")
 
 writeToTFile(OutF,THSanityChecks['NHits']['BeforeMatching']['PerEVT']['Reco'],"SanityChecks/NHits/BeforeMatching/")
@@ -875,7 +767,7 @@ writeToTFile(OutF,THSanityChecks['Occupancy']['BeforeMatching']['Reco'],"SanityC
 
 writeToTFile(OutF,STAdirX_vs_CLS,"SanityChecks/CLS_vs_Direction/")
 writeToTFile(OutF,THSanityChecks['pt']['All'],"SanityChecks/pt/")
-if DLE: writeToTFile(OutF,DLE_pt,"SanityChecks/pt/")
+if parameters["DLE"]: writeToTFile(OutF,DLE_pt,"SanityChecks/pt/")
 
 for key in ['ML1','ML2','PL1','PL2']:
     writeToTFile(OutF,THSanityChecks['Occupancy']['BeforeMatching'][key]['PropHits'],"SanityChecks/Occupancy/BeforeMatching/"+key)
@@ -942,7 +834,7 @@ for matchingVar in matching_variables:
         writeToTFile(OutF,TH2Fresidual_collector[matchingVar][chambers]['glb_phi']['TH2F'],"Residuals/MatchingOn_"+matchingVar+"/2D_glb_phi")
         writeToTFile(OutF,TH2Fresidual_collector[matchingVar][chambers]['glb_rdphi']['TH2F'],"Residuals/MatchingOn_"+matchingVar+"/2D_glb_rdphi")
 
-    efficiency2DPlotAll,Num2DAll,Den2DAll,SummaryAll = generateEfficiencyPlot2DGE11(EfficiencyDictGlobal[matchingVar],[-1,1],[1,2],debug=args.verbose)
+    efficiency2DPlotAll,Num2DAll,Den2DAll,SummaryAll = generateEfficiencyPlot2DGE11(EfficiencyDictGlobal[matchingVar],[-1,1],[1,2],debug=parameters["verbose"])
     EffiDistrAll = generateEfficiencyDistribution(EfficiencyDictGlobal[matchingVar])
     GE11efficiencyByEta_Short,GE11efficiencyByEta_Long,GE11efficiencyByEta_All = generateEfficiencyPlotbyEta(EfficiencyDictGlobal[matchingVar],[1,-1],[1,2])
     GE11efficiencyByPt_Short,GE11efficiencyByPt_Long,GE11efficiencyByPt_All = generateEfficiencyPlotbyPt(EfficiencyDictGlobal[matchingVar])
@@ -962,7 +854,7 @@ for matchingVar in matching_variables:
     writeToTFile(OutF,GE11efficiencyByPt_Long,"Efficiency/"+matchingVar+"/ByPt/")
     writeToTFile(OutF,GE11efficiencyByPt_All,"Efficiency/"+matchingVar+"/ByPt/")
 
-    if DLE and matchingVar=='glb_rdphi':
+    if parameters["DLE"] and matchingVar=='glb_rdphi':
         DLE_2DPlotAll,DLE_Num2DAll,DLE_Den2DAll,DLE_SummaryAll = generateEfficiencyPlot2DGE11(EfficiencyDictLayer[matchingVar],[-1,1],[1,2])
         DLE_ByEta_Short,DLE_ByEta_Long,DLE_ByEta_All = generateEfficiencyPlotbyEta(EfficiencyDictLayer[matchingVar],[1,-1],[1,2])
         writeToTFile(OutF,DLE_2DPlotAll,"Efficiency/DLE/2DView/")
@@ -996,7 +888,7 @@ for matchingVar in matching_variables:
             writeToTFile(OutF,Summary,"Efficiency/"+matchingVar+"/")
 
 
-            if DLE and matchingVar=='glb_rdphi':
+            if parameters["DLE"] and matchingVar=='glb_rdphi':
                 DLE_2DPlot,DLE_Num2D,DLE_Den2D,DLE_Summary = generateEfficiencyPlot2DGE11(EfficiencyDictLayer[matchingVar],r,l)
                 DLE_ByEta_Short,DLE_ByEta_Long,DLE_ByEta_All =  generateEfficiencyPlotbyEta(EfficiencyDictLayer[matchingVar],r,l)
                 writeToTFile(OutF,DLE_2DPlot,"Efficiency/DLE/2DView/"+endcapTag+"/")
@@ -1012,19 +904,19 @@ for matchingVar in matching_variables:
                 plot_obj.Draw("COLZ TEXT45")
                 c1.Modified()
                 c1.Update()
-                c1.SaveAs("./Output/PFA_Analyzer_Output/Plot/"+outputname+"/"+matchingVar+"/"+plot_obj.GetTitle()+".pdf")
+                c1.SaveAs("./Output/PFA_Analyzer_Output/Plot/"+parameters["outputname"]+"/"+matchingVar+"/"+plot_obj.GetTitle()+".pdf")
             
             Summary.Draw("APE")
             c1.Modified()
             c1.Update()
-            c1.SaveAs("./Output/PFA_Analyzer_Output/Plot/"+outputname+"/"+matchingVar+"/"+Summary.GetTitle()+".pdf")
+            c1.SaveAs("./Output/PFA_Analyzer_Output/Plot/"+parameters["outputname"]+"/"+matchingVar+"/"+Summary.GetTitle()+".pdf")
 
             c2.cd()
             endcapVFAT2D = generate2DEfficiencyPlotbyVFAT(EfficiencyDictVFAT[matchingVar],endcapTag)
             endcapVFAT2D.Draw("COLZ TEXT")
             c2.Modified()
             c2.Update()
-            c2.SaveAs("./Output/PFA_Analyzer_Output/Plot/"+outputname+"/"+matchingVar+"/"+endcapVFAT2D.GetTitle()+".pdf")
+            c2.SaveAs("./Output/PFA_Analyzer_Output/Plot/"+parameters["outputname"]+"/"+matchingVar+"/"+endcapVFAT2D.GetTitle()+".pdf")
 
             writeToTFile(OutF,efficiencyByEta_Short,"Efficiency/"+matchingVar+"/ByEta/"+endcapTag+"/")
             writeToTFile(OutF,efficiencyByEta_Long,"Efficiency/"+matchingVar+"/ByEta/"+endcapTag+"/")
@@ -1059,7 +951,7 @@ for matchingVar in matching_variables:
 for key in TH1MetaData.keys():
     writeToTFile(OutF,TH1MetaData[key],"Metadata/")
 
-printSummary(EfficiencyDictGlobal,matching_variables,ResidualCutOff,matching_variable_units,debug=args.verbose)
+printSummary(EfficiencyDictGlobal,matching_variables,ResidualCutOff,matching_variable_units,debug=parameters["verbose"])
 
 ## CSV
 for matchingVar in matching_variables:
@@ -1084,11 +976,11 @@ for matchingVar in matching_variables:
                 tempList_byVFAT.append([chID,endcap_key,VFATN,subDict[VFATN]['num'],subDict[VFATN]['den']])
 
     data = pd.DataFrame(tempList,columns=['chamberID',"region","chamber","layer","etaPartition","matchedRecHit","propHit","AVG_CLS","AVG_pt"])
-    data.to_csv('./Output/PFA_Analyzer_Output/CSV/'+outputname+'/MatchingSummary_'+matchingVar+'.csv', index=False)
+    data.to_csv('./Output/PFA_Analyzer_Output/CSV/'+parameters["outputname"]+'/MatchingSummary_'+matchingVar+'.csv', index=False)
     
     data_byVFAT = pd.DataFrame(tempList_byVFAT,columns=['chamberID',"EndcapTag","VFATN","matchedRecHit","propHit"])
-    data_byVFAT.to_csv('./Output/PFA_Analyzer_Output/CSV/'+outputname+'/MatchingSummary_'+matchingVar+'_byVFAT.csv', index=False)
-if DLE:
+    data_byVFAT.to_csv('./Output/PFA_Analyzer_Output/CSV/'+parameters["outputname"]+'/MatchingSummary_'+matchingVar+'_byVFAT.csv', index=False)
+if parameters["DLE"]:
     for etaPID,subDict in EfficiencyDictLayer['glb_rdphi'].items():
         region,chamber,layer,eta = getInfoFromEtaID(etaPID)
 
@@ -1097,12 +989,11 @@ if DLE:
         chID = ReChLa2chamberName(region,chamber,layer)
         tempList_byDLE.append([chID,region,chamber,layer,eta,matchedRecHit,propHit])
     data_byDLE = pd.DataFrame(tempList_byDLE,columns=['chamberID',"region","chamber","layer","etaPartition","matchedRecHit","propHit"])
-    data_byDLE.to_csv('./Output/PFA_Analyzer_Output/CSV/'+outputname+'/MatchingSummary_glb_rdphi_byDLE.csv', index=False)
+    data_byDLE.to_csv('./Output/PFA_Analyzer_Output/CSV/'+parameters["outputname"]+'/MatchingSummary_glb_rdphi_byDLE.csv', index=False)
 
+OutF.Close()
 print(f"\n#############\nOUTPUT\n#############")
-print(f"\tCSVs in \t./Output/PFA_Analyzer_Output/CSV/{outputname}")
-print(f"\tROOT_File \t ./Output/PFA_Analyzer_Output/ROOT_File/{outputname}.root")
+print(f"\tCSVs in \t./Output/PFA_Analyzer_Output/CSV/{parameters['outputname']}")
+print(f"\tROOT_File \t ./Output/PFA_Analyzer_Output/ROOT_File/{parameters['outputname']}.root")
 # print "\tMatchingTTree File \t"+"./Output/PFA_Analyzer_Output/ROOT_File/MatchingTree_"+outputname+".root"
-print(f"\tPlots in\t./Output/PFA_Analyzer_Output/Plot/{outputname}")
-
-
+print(f"\tPlots in\t./Output/PFA_Analyzer_Output/Plot/{parameters['outputname']}")

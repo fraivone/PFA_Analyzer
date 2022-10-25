@@ -432,7 +432,8 @@ def HistoGausFit(h):
 
 if __name__ == '__main__':
     ROOT.gROOT.SetBatch(True)
-    print(files_in_folder("357479_Prompt"))
+    mp = Map_TFile("/eos/cms/store/group/dpg_gem/comm_gem/P5_Commissioning/2022/GEMCommonNtuples/Muon/360018_ZMu/221023_204649/0000/MuDPGNtuple_1.root")
+    printMap(mp)
     # fn = "Aggregate.root"
     # openFile = ROOT.TFile("Aggregate.root","update")
     # mp=Map_TFile(fn)

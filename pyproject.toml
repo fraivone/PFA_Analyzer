@@ -16,6 +16,7 @@ pandas = "1.1.5"
 matplotlib = "^3.3.4"
 scipy = "^1.1.0"
 tqdm = "^4.64.1"
+PyYAML = "^6.0"
 
 
 [tool.poetry.dev-dependencies]

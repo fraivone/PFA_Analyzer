@@ -10,6 +10,11 @@ from EtaPartitionBoundaries import *
 import sys
 import json
 from array import array
+import yaml
+import pathlib
+import time
+import logging
+
 
 map_cutcode_to_quantity = {-1:"ErrPropR",
                            -2:"ErrPropPhi",
@@ -17,6 +22,91 @@ map_cutcode_to_quantity = {-1:"ErrPropR",
                            -4:"pT",
                            -5:"chi2",
                            -6:"minMExhit"}
+
+parameters_default = {
+    'phi_cut':{"type":float,"default":0.0025},
+    'rdphi_cut':{"type":float,"default":0.5},
+    'chi2cut':{"type":float,"default":9999999},
+    'minPt':{"type":float,"default":0},
+    'outputname':{"type":str,"default":time.strftime("%-y%m%d_%H%M")},
+    'fiducialR':{"type":float ,"default":1},
+    'fiducialPhi':{"type":float ,"default":0.005},
+    'maxErrPropR':{"type":float ,"default":1},
+    'maxErrPropPhi':{"type":float,"default":0.005},
+    'DLE':{"type":bool,"default":False},
+    'FD':{"type":bool,"default":False},
+    'verbose':{"type":bool,"default":False},
+    'fiducialCut' :{"type":bool,"default":True},
+    'doGE21':{"type":bool,"default":False},
+    'minME1':{"type":int,"default":0},
+    'minME2':{"type":int,"default":0},
+    'minME3':{"type":int,"default":0},
+    'minME4':{"type":int,"default":0},
+}
+
+numpy_type = { int:"int32",float:"float32",bool:np.bool_,str:"<S20",tuple:numpy.dtype('int32,int32')}
+ROOT_type = { int:"I",float:"F",bool:"b",str:"C",tuple:"I"}
+
+def load_config(filepath,verbose=True):
+    filepath = pathlib.Path(filepath)
+    data_ranges = {}
+    parameters = {}
+    
+    with filepath.open() as ymlfile:
+        cfg = yaml.full_load(ymlfile)
+
+    cfg_data = cfg["data"]
+    cfg_param = cfg["parameters"]
+
+    ## DATA CFG
+    for run,value in cfg_data.items():
+        data_ranges[run] = value
+        print(value["VFATOFF"])
+        data_ranges[run]["lumisection"] = tuple(sorted(data_ranges[run]["lumisection"])) if data_ranges[run]["lumisection"] is not None else (0,0)
+        data_ranges[run]["nevts"] = data_ranges[run]["nevts"] if data_ranges[run]["nevts"] is not None else -1
+        data_ranges[run]["VFATOFF"] = {} if value["VFATOFF"] is None else importOFFVFAT(value["VFATOFF"])
+        data_ranges[run]["chamberOFF"]= {} if value["chamberOFF"] is None else ChamberOFF_byLS(value["chamberOFF"])
+    ## DATA CFG
+
+
+    ## PARAM CFG
+    # load not None parameters that match default var type
+    for param,value in cfg_param.items():
+        if param not in parameters_default.keys():
+            logging.warning(f"Found {param} in {filepath} is not a known input parameter. Skipped")
+            continue
+        
+        if not isinstance(value, parameters_default[param]['type']) and value is not None: 
+            logging.error(f"Found {value} of type {type(value)} for {param}. Not of type {parameters_default[param]['type']}. Skipped")
+        
+        elif value is None: pass
+            
+        else: parameters[param] = value
+    
+    # defaulting the others
+    default_param = [x for x in parameters_default if x not in parameters]
+    for k in default_param:
+        parameters[k] = parameters_default[k]["default"]
+    ## PARAM CFG
+
+    
+    logging.debug("### CFG Data")
+    logging.debug(f"{'Run':<20}{'Param':<20}{'Value':<20}")
+    for run in data_ranges:
+        logging.debug(f"{run:<20}{'':>20}{'':>20}")
+        for k,value in data_ranges[run].items():
+            logging.debug(f"{'':<20}{k:<20}{value}")
+    logging.debug("### CFG Data")
+
+    logging.debug("### CFG Param")
+    logging.debug(f"{'Param':<20}{'Value':>12}")
+    for x in [ k for k in parameters if k not in default_param ]:
+        logging.debug(f"{x:<20}{parameters[x]:>12}")
+    for x in default_param:
+        logging.debug(f"{x:<20}{parameters[x]:>12}{' (default)':>10}")
+    logging.debug("### CFG Param\n")
+
+    return data_ranges,parameters
 
 
 def getInfoFromEtaID(id):
@@ -35,39 +125,11 @@ def GE11_ChamberIDs():
             list_of_chambers.append(chID)
     return list_of_chambers
 
-## Expects to have a list of file paths each containing a list of "GE11-*-XXLY" to be excluded
-def importOFFChamber(list_of_file_path):
-    chamberNumberOFF = []
-    for file_path in list_of_file_path:   
-        try:
-            with open(file_path, "r") as my_file:
-                content = my_file.read()
-                chamber_OFF_list = content.split("\n")
-                try: ## Will remove 1 empty entry from the list, if any
-                    chamber_OFF_list.remove('')
-                except:
-                    pass
-                try:
-                    findChambers = [ chamberName2ReChLa(k) for k in chamber_OFF_list]
-                except:
-                    print("Error in the formatting of Chamber names in the file " + file_path+"\nExiting ..")
-                    sys.exit(0)
-                ## Avoiding duplicates
-                for chamber in findChambers:
-                    if chamber not in chamberNumberOFF:
-                        chamberNumberOFF.append(chamber)
-        except IOError:
-            print("Couldn't open file : "+file_path+"\nExiting ..")
-            sys.exit(0)
-    
-    return chamberNumberOFF
-
-
 
 ## Expects to have a list of file paths each containing a list of "GE11-*-XXLY" to be excluded
 def ChamberOFF_byLS(file_path):
     try:
-        io = open(file_path[0],"r")
+        io = open(file_path,"r")
         dictionary = json.load(io)  
     except IOError:
             print("Couldn't open file : "+file_path+"\nExiting ..")
@@ -125,30 +187,29 @@ def propHit2VFAT(glb_r,loc_x,etaP,region,chamber_number):
     return VFAT
 
 ## returns a dict with a list of OFF VFAT for each  etapartitionID (key of the dict)
-def importOFFVFAT(list_of_file_path):
+def importOFFVFAT(file_path):
     off_VFAT = {}
-    for file_path in list_of_file_path:
-        try:
-            df = pd.read_csv(file_path, sep='\t')
-        except IOError:
-            print("Couldn't open file : "+file_path+"\nExiting ..")
-            sys.exit(0)
+    try:
+        df = pd.read_csv(file_path, sep='\t')
+    except IOError:
+        print("Couldn't open file : "+file_path+"\nExiting ..")
+        sys.exit(0)
 
-        off_VFAT = {}
-        for index, row in df.iterrows():
-            region =  -1 if ( row['region']=='N' or row['region']=='M') else (1 if row['region']=='P' else None) ## In the past N was used... currently M indicates the minus endcap
-            layer = int(row['layer'])
-            chamber = int(row['chamber'])
-            VFAT = int(row['VFAT'])
-            maskReason = int(row['reason_mask'])
+    off_VFAT = {}
+    for index, row in df.iterrows():
+        region =  -1 if ( row['region']=='N' or row['region']=='M') else (1 if row['region']=='P' else None) ## In the past N was used... currently M indicates the minus endcap
+        layer = int(row['layer'])
+        chamber = int(row['chamber'])
+        VFAT = int(row['VFAT'])
+        maskReason = int(row['reason_mask'])
 
-            iEta , iPhi = VFAT2iEta_iPhi(VFAT)
-            etaPartitionID = region*(100*chamber+10*layer+iEta)
+        iEta , iPhi = VFAT2iEta_iPhi(VFAT)
+        etaPartitionID = region*(100*chamber+10*layer+iEta)
 
-            ## If the key doesn't exsist create it, then fill the list
-            off_VFAT.setdefault(etaPartitionID,[])
-            if maskReason == 1:  ## only mask empty VFATs
-                off_VFAT[etaPartitionID].append(VFAT)
+        ## If the key doesn't exsist create it, then fill the list
+        off_VFAT.setdefault(etaPartitionID,[])
+        if maskReason == 1:  ## only mask empty VFATs
+            off_VFAT[etaPartitionID].append(VFAT)
 
     return off_VFAT
 
@@ -175,7 +236,7 @@ def EndcapLayer2label(re,layer):
     return label+str(int(layer))
     
 
-def ChambersOFFHisto(chamberNumberOFF_byLS,maxLS):
+def ChambersOFFHisto(chamberNumberOFF_byLS,minLS,maxLS):
     GE11_OFF = {-1:{},1:{}}
     GE11_OFF[-1][1] = ROOT.TH1F("GE11-M-L1  Masked Chambers","GE11-M-L1  Masked Chambers",36,0.5,36.5)
     GE11_OFF[-1][2] = ROOT.TH1F("GE11-M-L2  Masked Chambers","GE11-M-L2  Masked Chambers",36,0.5,36.5)
@@ -186,8 +247,8 @@ def ChambersOFFHisto(chamberNumberOFF_byLS,maxLS):
         for layer in [1,2]:
             for chamber in range(1,37):
                 ch_ID = ReChLa2chamberName(region,chamber,layer) 
-                n_OFF = 0 if ch_ID not in chamberNumberOFF_byLS else (len(chamberNumberOFF_byLS[ch_ID]) if -1 not in chamberNumberOFF_byLS[ch_ID] else maxLS)
-                percentageOFF = 100*float(n_OFF)/maxLS
+                n_OFF = 0 if ch_ID not in chamberNumberOFF_byLS else len([k for k in chamberNumberOFF_byLS[ch_ID] if k > minLS and k < maxLS]) if -1 not in chamberNumberOFF_byLS[ch_ID] else (maxLS-minLS)
+                percentageOFF = 100*float(n_OFF)/(maxLS-minLS)
                 GE11_OFF[region][layer].SetBinContent(chamber,percentageOFF)
     for key_1 in GE11_OFF.keys():
         for key_2 in GE11_OFF[key_1].keys():
@@ -222,7 +283,7 @@ def VFATOFFHisto(VFATOFF_dictionary):
     return VFAT_OFFTH2D[-1][1],VFAT_OFFTH2D[1][1],VFAT_OFFTH2D[-1][2],VFAT_OFFTH2D[1][2]
 
 
-def GE11DiscardedSummary(chamberNumberOFF_byLS,maxLS,VFATOFF_dictionary):
+def GE11DiscardedSummary(chamberNumberOFF_byLS,minLS,maxLS,VFATOFF_dictionary):
     VFAT_OFFTH2D = {-1:{},1:{}}
     VFAT_OFFTH2D[-1][1] = ROOT.TH2F("GE11-M-L1  Masked","GE11-M-L1  Masked",36,0.5,36.5,24,-0.5,23.5)
     VFAT_OFFTH2D[-1][2] = ROOT.TH2F("GE11-M-L2  Masked","GE11-M-L2  Masked",36,0.5,36.5,24,-0.5,23.5)
@@ -248,8 +309,8 @@ def GE11DiscardedSummary(chamberNumberOFF_byLS,maxLS,VFATOFF_dictionary):
         for layer in [1,2]:
             for chamber in range(1,37):
                 current_chamber_ID = ReChLa2chamberName(region,chamber,layer)
-                n_OFF = 0 if current_chamber_ID not in chamberNumberOFF_byLS else (len(chamberNumberOFF_byLS[current_chamber_ID]) if -1 not in chamberNumberOFF_byLS[current_chamber_ID] else maxLS)
-                percentageOFF = 100*float(n_OFF)/maxLS
+                n_OFF = 0 if current_chamber_ID not in chamberNumberOFF_byLS else len([k for k in chamberNumberOFF_byLS[current_chamber_ID] if k > minLS and k < maxLS]) if -1 not in chamberNumberOFF_byLS[current_chamber_ID] else (maxLS-minLS)
+                percentageOFF = 100*float(n_OFF)/(maxLS-minLS)
                 for VFATN in range(0,24):
                     eta,phi = VFAT2iEta_iPhi(VFATN)
                     etaPartitionID = region*(100*chamber+10*layer+eta)
@@ -260,6 +321,41 @@ def GE11DiscardedSummary(chamberNumberOFF_byLS,maxLS,VFATOFF_dictionary):
                         VFAT_OFFTH2D[region][layer].SetBinContent(chamber,VFATN+1,percentageOFF)
 
     return [VFAT_OFFTH2D[-1][1],VFAT_OFFTH2D[1][1],VFAT_OFFTH2D[-1][2],VFAT_OFFTH2D[1][2]]
+
+
+def GenerateMetadata(parameters,data_ranges):
+    TH1MetaData = {}
+    TH1MetaData["Parameters"] = ROOT.TTree("Parameters", "Parameters")
+    par_array = {}
+    for par,value in parameters.items():
+        par_type = parameters_default[par]["type"]
+        par_array[par] = np.empty((1), dtype = numpy_type[par_type] )
+        TH1MetaData["Parameters"].Branch(par, 
+                                        par_array[par], 
+                                        f"par_array/{ROOT_type[par_type]}"
+                                    )
+        par_array[par][0] = value
+    TH1MetaData["Parameters"].Fill()
+
+    for run,sub_dict in data_ranges.items():
+        TH1MetaData[run] = ROOT.TTree(f"run{run}", f"run{run}")
+        data_range_array = {}
+        for par,value in sub_dict.items():
+            if par in ["chamberOFF","VFATOFF","lumisection"]: continue
+            par_type = type(value)
+            data_range_array[par] = np.empty((1), dtype = numpy_type[par_type] )
+            TH1MetaData[run].Branch(par, 
+                                    data_range_array[par], 
+                                    f"data_range_array/{ROOT_type[par_type]}"
+                                )
+            data_range_array[par][0] = value
+        
+        lumi_array = np.array(list(sub_dict["lumisection"]), dtype = "float32")
+        TH1MetaData[run].Branch("lumisection", lumi_array, "lumi_array[2]/F")
+        TH1MetaData[run].Fill()
+
+    return TH1MetaData
+
 
 def incidenceAngle_vs_Eff(sourceDict,input_region=1,input_layer=1):
     ## Transforming in list
