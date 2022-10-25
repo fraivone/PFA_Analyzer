@@ -34,7 +34,8 @@ files = []
 for run in data_ranges:
     run_tag  = data_ranges[run]["tag"]
     file_tag  = data_ranges[run]["file_tag"]
-    files = files + files_in_folder(run_tag,filename_tag=file_tag)
+    path_tag = data_ranges[run]["path_tag"]
+    files = files + files_in_folder(run_tag,path_tag=path_tag,filename_tag=file_tag)
 
 matching_variables = ['glb_phi','glb_rdphi']
 matching_variable_units = {'glb_phi':'rad','glb_rdphi':'cm'}
@@ -256,6 +257,7 @@ for chain_index,evt in enumerate(chain):
     PropHit_Dict = {}
 
     for RecHit_index in range(0,n_gemrec):
+        station = evt.gemRecHit_station[RecHit_index]
         region = evt.gemRecHit_region[RecHit_index]
         chamber = evt.gemRecHit_chamber[RecHit_index]
         layer = evt.gemRecHit_layer[RecHit_index]
@@ -263,6 +265,10 @@ for chain_index,evt in enumerate(chain):
         RecHitEtaPartitionID =  region*(100*chamber+10*layer+etaP)
         endcapKey = EndcapLayer2label(region,layer)
         chamberID = ReChLa2chamberName(region,chamber,layer)
+
+        if not parameters["doGE21"] and station == 2: 
+            #logging.debug(f"Skipping current rechit cause station = {station}")
+            continue
         
         ## discard chambers that were kept OFF from the analysis
         if chamberID in data_ranges[RunNumber]["chamberOFF"].keys() and (LumiSection in data_ranges[RunNumber]["chamberOFF"][chamberID] or -1 in data_ranges[RunNumber]["chamberOFF"][chamberID] ):
@@ -315,10 +321,15 @@ for chain_index,evt in enumerate(chain):
     
     for PropHit_index in range(0,n_gemprop):
         
+        station = evt.mu_propagated_station[PropHit_index]
         region = evt.mu_propagated_region[PropHit_index]
         chamber = evt.mu_propagated_chamber[PropHit_index]
         layer = evt.mu_propagated_layer[PropHit_index]
         etaP = evt.mu_propagated_etaP[PropHit_index]
+        
+        if not parameters["doGE21"] and station == 2: 
+            #logging.debug(f"Skipping current prophit cause station = {station}")
+            continue
         if etaP >= 9: ## from CMSSW_12_2_1 GE21 demonstrator is also included in the propagated chambers
             continue
 

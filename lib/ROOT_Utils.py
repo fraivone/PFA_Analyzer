@@ -386,17 +386,16 @@ def writeToTFile(file,obj,directory=None,forceUpdate=False):
     
     obj.Write()
 
-def files_in_folder(folder,filename_tag=None):
+def files_in_folder(folder,path_tag=None,filename_tag=None):
     files  = []
 
     for root, dirnames, filenames in os.walk('/eos/cms/store/group/dpg_gem/comm_gem/P5_Commissioning/'):
-        if folder in root.split("/") and "GEMCommonNtuples" in root:
+        if folder in root.split("/") and "GEMCommonNtuples" in root and path_tag in root:
             for filename in fnmatch.filter(filenames,'*root'):
-                if filename_tag == None:
+                if filename_tag is None or filename_tag in filename:
                     files.append(root+"/"+filename)
                 else:
-                    if filename_tag in filename:
-                        files.append(root+"/"+filename)
+                    pass
     return files
 
 # bool values are handled with custom type in the ntuples.
