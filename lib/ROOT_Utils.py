@@ -390,8 +390,9 @@ def files_in_folder(folder,path_tag=None,filename_tag=None):
     files  = []
 
     for root, dirnames, filenames in os.walk('/eos/cms/store/group/dpg_gem/comm_gem/P5_Commissioning/'):
-        if folder in root.split("/") and "GEMCommonNtuples" in root and path_tag in root:
+        if folder in root.split("/") and "GEMCommonNtuples" in root:
             for filename in fnmatch.filter(filenames,'*root'):
+                if path_tag is not None and path_tag not in root: continue
                 if filename_tag is None or filename_tag in filename:
                     files.append(root+"/"+filename)
                 else:
