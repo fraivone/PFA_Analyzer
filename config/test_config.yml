@@ -1,17 +1,16 @@
-data: 
-        360019:                                         # run number
-                tag: 360019_ZMu                      # run tag
-                file_tag: MuDPGNtuple                 # file tag, usually MuDPGNtuple
-                path_tag: !!python/str 221023_204654                 # file tag, usually MuDPGNtuple
-                lumisection: !!python/tuple [0,10000]    # lumisection range of interest
-                nevts: 8001                             # max number of events to be processed
-                chamberOFF:                             # chamber mask
-                VFATOFF:                                # VFAT OFF mask
-
+data:
+        360019: # run number
+                tag: 360019_ZMu # run tag
+                file_tag: MuDPGNtuple # file tag, usually MuDPGNtuple
+                path_tag: !!python/str 221106_020350 # path_tag, usually date of creation
+                lumisection: !!python/tuple [958, 10000] # lumisection range of interest
+                nevts:   # max number of events to be processed
+                chamberOFF: /afs/cern.ch/user/f/fivone/Test/Analyzer/ExcludeMe/ChamberOFF_Run_360019.json # chamber mask
+                VFATOFF: # VFAT OFF mask
 parameters:
-        phi_cut: 0.0025                                 # matching window in phi
-        rdphi_cut: 0.5                                  # matching window in RdeltaPhi
-        minPt: !!python/float 10                        # minimum pT cut
-        chi2cut:                                        # maximum reduced chi2, minimum is always > 0.5
-        verbose:                                        # verbose 
-        outputname: ConfigTest                          # outputname for ROOT file and CSVs
+        phi_cut: 0.0025 # matching window in phi
+        rdphi_cut: 0.5 # matching window in RdeltaPhi
+        minPt: !!python/float 10 # minimum pT cut
+        chi2cut: # maximum reduced chi2, minimum is always > 0.5
+        verbose: # verbose
+        outputname: ConfigTest # outputname for ROOT file and CSVs
