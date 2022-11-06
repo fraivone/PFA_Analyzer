@@ -47,6 +47,11 @@ parameters_default = {
 numpy_type = { int:"int32",float:"float32",bool:np.bool_,str:"<S20",tuple:numpy.dtype('int32,int32')}
 ROOT_type = { int:"I",float:"F",bool:"b",str:"C",tuple:"I"}
 
+## Magic numbers taken from strip geometry
+#  They are loc_x/glb_r (basically cos phi) for strip 127 and 255 respectively
+LeftMost_iPhi_boundary = -0.029824804
+RightMost_iPhi_boundary = 0.029362374
+
 def load_config(filepath,verbose=True):
     filepath = pathlib.Path(filepath)
     data_ranges = {}
@@ -61,7 +66,6 @@ def load_config(filepath,verbose=True):
     ## DATA CFG
     for run,value in cfg_data.items():
         data_ranges[run] = value
-        print(value["VFATOFF"])
         data_ranges[run]["lumisection"] = tuple(sorted(data_ranges[run]["lumisection"])) if data_ranges[run]["lumisection"] is not None else (0,0)
         data_ranges[run]["nevts"] = data_ranges[run]["nevts"] if data_ranges[run]["nevts"] is not None else -1
         data_ranges[run]["VFATOFF"] = {} if value["VFATOFF"] is None else importOFFVFAT(value["VFATOFF"])
@@ -108,6 +112,10 @@ def load_config(filepath,verbose=True):
 
     return data_ranges,parameters
 
+def etaPID(station,region,chamber,layer):
+    region*(100*chamber+10*layer+etaP)
+    pass
+
 
 def getInfoFromEtaID(id):
     etaPartition = abs(id)%10
@@ -121,7 +129,7 @@ def GE11_ChamberIDs():
     list_of_chambers = []
     for (re,la) in [(1,1),(1,2),(-1,1),(-1,2)]:
         for chamber in range(1,37):
-            chID = ReChLa2chamberName(re,chamber,la)
+            chID = getChamberName(re,chamber,la)
             list_of_chambers.append(chID)
     return list_of_chambers
 
@@ -152,7 +160,7 @@ def VFAT2iEta_iPhi(VFATN):
         sys.exit(0)
 
     iEta = (8 - vfatPosition%8)
-    iPhi = vfatPosition/8
+    iPhi = vfatPosition//8
     return iEta,iPhi
 
 def iEta_iPhi2VFAT(iEta,iPhi):
@@ -161,24 +169,36 @@ def iEta_iPhi2VFAT(iEta,iPhi):
         phi = int(iPhi)
     except:
         print("Provided iEta and/or iPhi are not numbers.\nExiting...")
+        print(iEta,iPhi)
         sys.exit(0)
     
     if iEta <1 or iEta>8 or iPhi <0 or iPhi>2:
         print("Invalid iEta and/or iPhi provided position.\nExiting...")
+        print(iEta,iPhi)
         sys.exit(0)
     
     VFAT = iPhi*8 + (8-iEta)
     return VFAT
 
+def recHit2VFAT(etaP,firstStrip,CLS):
+    iphi_first = firstStrip//128
+    iphi_last = (firstStrip + CLS - 1 ) // 128
+    if iphi_last  == iphi_first:
+        iphi =  [iphi_first]
+    else: 
+        iphi = list(range(iphi_first, iphi_last+1))
+    VFATs = []
+    for phi in iphi:
+        VFATs.append(iEta_iPhi2VFAT(etaP,phi))
+    return VFATs
+
+
+
+
 ## Associates a propagated hit to a VFAT
 ## It is based on default GE11 geometry
 ## Might need refinements after alignment 
-def propHit2VFAT(glb_r,loc_x,etaP,region,chamber_number):
-    ## Magic numbers taken from strip geometry
-    #  They are loc_x/glb_r (basically cos phi) for strip 127 and 255 respectively
-    LeftMost_iPhi_boundary = -0.029824804
-    RightMost_iPhi_boundary = 0.029362374
-
+def propHit2VFAT(glb_r,loc_x,etaP):
     prophit_cosine = loc_x/glb_r
     iPhi =  0 if  prophit_cosine<=LeftMost_iPhi_boundary else (2 if prophit_cosine>RightMost_iPhi_boundary else 1)
         
@@ -186,6 +206,20 @@ def propHit2VFAT(glb_r,loc_x,etaP,region,chamber_number):
 
     return VFAT
 
+def VFATcompatibleHit(VFATs,glb_r,loc_x,etaP):
+    for VFAT in VFATs :
+        hit_cosine = loc_x/glb_r
+        iPhi_cosine_width = (abs(LeftMost_iPhi_boundary) + abs(RightMost_iPhi_boundary))/2
+        iEta,iPhi = VFAT2iEta_iPhi(VFAT)
+        if etaP == iEta:
+            if iPhi == 0 and abs(abs(hit_cosine)-abs(LeftMost_iPhi_boundary)) <= iPhi_cosine_width*0.05:
+                return True
+            elif iPhi == 1 and ( abs(abs(hit_cosine)-abs(LeftMost_iPhi_boundary)) <= iPhi_cosine_width*0.05 or abs(abs(hit_cosine)-abs(RightMost_iPhi_boundary)) <= iPhi_cosine_width*0.05 ):
+                return True
+            elif iPhi == 2 and abs(abs(hit_cosine)-abs(RightMost_iPhi_boundary)) <= iPhi_cosine_width*0.05:
+                return True
+
+    return False
 ## returns a dict with a list of OFF VFAT for each  etapartitionID (key of the dict)
 def importOFFVFAT(file_path):
     off_VFAT = {}
@@ -213,6 +247,29 @@ def importOFFVFAT(file_path):
 
     return off_VFAT
 
+def generateVFATMaskTH2(station=1):
+    if station != 1:
+        logging.error(f"function generateVFATMaskTH2() not implemented for station = 2. Exiting...")
+        sys.exit()
+    else:
+        output_dict = {}
+        for re,la in [(1,1),(1,2),(-1,1),(-1,2)]:
+            endcapTag = EndcapLayer2label(re,la)
+            output_dict[endcapTag] = ROOT.TH2F("GE11-"+endcapTag+"  Masked VFAT","GE11-"+endcapTag+"  Masked VFAT",36,0.5,36.5,24,-0.5,23.5)
+        for key_1 in output_dict.keys():
+            output_dict[key_1].GetYaxis().SetTitle("VFAT Number")
+            output_dict[key_1].GetXaxis().SetTitle("Chamber")
+            output_dict[key_1].GetXaxis().SetNdivisions(40,0,0,True)
+            output_dict[key_1].GetYaxis().SetNdivisions(40,0,0,True)
+            output_dict[key_1].GetYaxis().SetLabelSize(0.02)
+            output_dict[key_1].GetXaxis().SetLabelSize(0.02)
+            output_dict[key_1].GetXaxis().SetTickLength(0.005)
+            output_dict[key_1].GetYaxis().SetTickLength(0.005)
+            output_dict[key_1].SetStats(False)
+            output_dict[key_1].SetMinimum(0)
+    
+    return output_dict    
+
 def chamberName2ReChLa(chamberName):
     ## Accepts as input either 
         # GE11-M-03L1 or GE11-M-03L1-S
@@ -224,11 +281,12 @@ def chamberName2ReChLa(chamberName):
 
     return [re,ch,la]
 
-def ReChLa2chamberName(re,ch,la):
-    re,ch,la = int(re),int(ch),int(la)
+def getChamberName(re,ch,la,station=1):
+    st = "GE11-" if station == 1 else "GE21-" if station == 2 else "ME0-"
     endcap = "M" if re == -1 else "P"
-    size = "S" if ch%2 == 1 else "L"
-    chID = 'GE11-'+endcap+'-%02d' % ch +"L"+str(la)+"-"+size 
+    if station != 1: size = ""
+    else: size = "-L" if ch%2 == 0 else "-S"
+    chID = st+endcap+'-%02d' % ch +"L"+str(la)+size
     return chID
 
 def EndcapLayer2label(re,layer):
@@ -246,7 +304,7 @@ def ChambersOFFHisto(chamberNumberOFF_byLS,minLS,maxLS):
     for region in [-1,1]:
         for layer in [1,2]:
             for chamber in range(1,37):
-                ch_ID = ReChLa2chamberName(region,chamber,layer) 
+                ch_ID = getChamberName(region,chamber,layer) 
                 n_OFF = 0 if ch_ID not in chamberNumberOFF_byLS else len([k for k in chamberNumberOFF_byLS[ch_ID] if k > minLS and k < maxLS]) if -1 not in chamberNumberOFF_byLS[ch_ID] else (maxLS-minLS)
                 percentageOFF = 100*float(n_OFF)/(maxLS-minLS)
                 GE11_OFF[region][layer].SetBinContent(chamber,percentageOFF)
@@ -308,7 +366,7 @@ def GE11DiscardedSummary(chamberNumberOFF_byLS,minLS,maxLS,VFATOFF_dictionary):
     for region in [-1,1]:
         for layer in [1,2]:
             for chamber in range(1,37):
-                current_chamber_ID = ReChLa2chamberName(region,chamber,layer)
+                current_chamber_ID = getChamberName(region,chamber,layer)
                 n_OFF = 0 if current_chamber_ID not in chamberNumberOFF_byLS else len([k for k in chamberNumberOFF_byLS[current_chamber_ID] if k > minLS and k < maxLS]) if -1 not in chamberNumberOFF_byLS[current_chamber_ID] else (maxLS-minLS)
                 percentageOFF = 100*float(n_OFF)/(maxLS-minLS)
                 for VFATN in range(0,24):
@@ -467,7 +525,7 @@ def generate1DxResidualContainer(matching_variables,nbins,ResidualCutOff):
             output_dict[mv][endcap_key] = {}
 
             for chamber in range(1,37):
-                chID = ReChLa2chamberName(re,chamber,la)
+                chID = getChamberName(re,chamber,la)
                 output_dict[mv][endcap_key][chID] = {}
                 for eta in list(range(1,9))+["All"]:
                     titleTH1 = chID+"_eta"+str(eta)+"_"
@@ -491,13 +549,48 @@ def generate1DyResidualContainer(matching_variables,nbins,ResidualCutOff):
             output_dict[mv][endcap_key] = {}
 
             for chamber in range(1,37):
-                chID = ReChLa2chamberName(re,chamber,la)
+                chID = getChamberName(re,chamber,la)
                 output_dict[mv][endcap_key][chID] = {}
                 for eta in list(range(1,9))+["All"]:
                     titleTH1 = chID+"_eta"+str(eta)+"_"
                     output_dict[mv][endcap_key][chID][eta]={"Residual":ROOT.TH1F(titleTH1+"ResidualY",titleTH1+"ResidualY",nbins,minB,-minB)}
                     output_dict[mv][endcap_key][chID][eta]["Residual"].GetXaxis().SetTitle(x_axis_title)
     return output_dict
+
+
+
+def whichBitsAreTrue(value):
+    return np.flatnonzero(np.flip(np.where( np.array(list(np.binary_repr(value,width=24))) == '1', 1,0)))
+def whichBitsAreFalse(value):
+    return np.flatnonzero(np.flip(np.where( np.array(list(np.binary_repr(value,width=24))) == '1', 0,1)))
+vec_true = np.vectorize(whichBitsAreTrue,otypes=[list])
+vec_false = np.vectorize(whichBitsAreFalse,otypes=[list])
+vec_chamberName = np.vectorize(getChamberName,otypes=[list])
+
+def unpackVFATStatus(evt,VFATMaskBook):
+    VFATMasked_dict = {}
+    for k,layer in enumerate(evt.gemOHStatus_layer):
+        station = evt.gemOHStatus_station[k]
+        region = evt.gemOHStatus_region[k]
+        chamber = evt.gemOHStatus_chamber[k]
+        endcapTag = EndcapLayer2label(region,layer)
+        VFATsMasked = whichBitsAreFalse(evt.gemOHStatus_VFATMasked[k])
+        error = evt.gemOHStatus_errors[k]
+        warning = ord(evt.gemOHStatuswarnings[k])
+        chamberID = getChamberName(region,chamber,layer,station)
+
+        # if error or warning, mask the entire chamber
+        if (error != 0 or warning != 0) : 
+            VFATsMasked = list(range(24))
+        ## Not ready for GE21, VFAT range to be checked
+        if station != 2:
+            for v in VFATsMasked: VFATMaskBook[endcapTag].Fill(chamber,v)
+        
+
+        if VFATsMasked != []:
+            VFATMasked_dict[chamberID] = VFATsMasked if VFATMasked_dict.get(chamberID) is None else  np.append(VFATMasked_dict[chamberID],VFATsMasked)
+    
+    return VFATMasked_dict,VFATMaskBook
 
 
 # dict[matchingVar][endcaptag][chamberID][VFAT]
@@ -510,7 +603,7 @@ def generateVFATDict(matching_variables):
             endcap_key = EndcapLayer2label(re,la)
             output_dict[mv][endcap_key] = {}
             for chamber in range(1,37):
-                chID = ReChLa2chamberName(re,chamber,la)
+                chID = getChamberName(re,chamber,la)
                 output_dict[mv][endcap_key][chID] = {}
                 for VFAT in range(24):
                     output_dict[mv][endcap_key][chID][VFAT]={"num":0,"den":0}
@@ -528,7 +621,7 @@ def generatePropagationErrorContainer(maxErrOnPropR, maxErrOnPropPhi):
             output_dict[which_hit][endcap_key] = {}
 
             for chamber in range(1,37):
-                chID = ReChLa2chamberName(re,chamber,la)
+                chID = getChamberName(re,chamber,la)
                 output_dict[which_hit][endcap_key][chID] = {}
                 for eta in list(range(1,9))+["All"]:
                     titleTH1 = chID+"_eta"+str(eta)+"_"
@@ -816,7 +909,7 @@ def generate2DEfficiencyPlotbyVFAT(EfficiencyDictVFAT,efficiency_target):
             chamberSize = "Short" if chamber_number%2 == 1 else "Long"
             
             region = 1 if endcapTag[0]=="P" else -1
-            chamber_ID = ReChLa2chamberName(region,chamber_number,endcapTag[-1])           
+            chamber_ID = getChamberName(region,chamber_number,endcapTag[-1])           
             
             angle_deg = -90 + (chamber_number - 1)*10## degrees
             angle_rad = np.radians(angle_deg)
@@ -977,7 +1070,7 @@ def generateEffDistr(filepath):
     EfficiencyDistribution = ROOT.TH1F("EfficiencyDistribution","EfficiencyDistribution",50,50.,100.)
     for re,la in [(-1,1),(1,1),(-1,2),(1,2)]: 
         for chamber in range(1,37):
-            chamberID = ReChLa2chamberName(re,chamber,la)
+            chamberID = getChamberName(re,chamber,la)
             n,d,_ = ChamberEfficiencyFromCSV(filepath,chamberID)
             if float(d) !=0.:
                 EfficiencyDistribution.Fill(100*float(n)/d)
