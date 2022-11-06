@@ -9,25 +9,31 @@ import pandas as pd
 from ROOT_Utils import *
 from PFA_Analyzer_Utils import *
 import logging 
+import cProfile,pstats
+profiler = cProfile.Profile()
+
+
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-logging.basicConfig(format='[{asctime}] {levelname} - {message}', datefmt='%B %d - %H:%M:%S',level=logging.DEBUG,style="{")
+logging.basicConfig(format='[{asctime}] {levelname} - {message}', datefmt='%B %d - %H:%M:%S',level=logging.INFO,style="{")
 logging.addLevelName( logging.DEBUG, "\033[1;90m%s\033[1;0m" % logging.getLevelName(logging.DEBUG))
 logging.addLevelName( logging.INFO, "\033[1;92m%s\033[1;0m" % logging.getLevelName(logging.INFO))
 logging.addLevelName( logging.WARNING, "\033[1;93m%s\033[1;0m" % logging.getLevelName(logging.WARNING))
 logging.addLevelName( logging.ERROR, "\033[1;31m%s\033[1;0m" % logging.getLevelName(logging.ERROR))
+
 
 parser = argparse.ArgumentParser(description='PFA Analyzer parser')
 parser.add_argument('config', help='Analysis description file')
 args = parser.parse_args()
 
 start_time = time.time()
-chamberForEventDisplay = ["GE11-P-28L2-L"]
+# chamberForEventDisplay = ["GE11-P-28L2-L"]
 data_ranges,parameters = load_config(os.path.abspath(args.config))
 TH1MetaData = GenerateMetadata(parameters,data_ranges)
 
-ROOT.gROOT.SetBatch(True)
+ROOT.gStyle.SetPaintTextFormat("2.2f")
 ROOT.gStyle.SetLineScalePS(1)
+ROOT.gROOT.SetBatch(True)
 if not parameters["verbose"]: ROOT.gROOT.ProcessLine("gErrorIgnoreLevel=2001;") #suppressed everything less-than-or-equal-to kWarning
 
 files = []
@@ -63,7 +69,8 @@ TH1Fresidual_collector_x = generate1DxResidualContainer(matching_variables,TH1nb
 TH1Fresidual_collector_y = generate1DyResidualContainer(matching_variables,TH1nbins,ResidualCutOff)
 TH1FpropError_collector = generatePropagationErrorContainer(parameters["maxErrPropR"], parameters["maxErrPropPhi"])
 TH2Fresidual_collector = generate2DResidualContainer(matching_variables,TH2nbins,TH2min)  
-TH2FexcludedProphits_collector = generate2DMap_ExcludedHits(TH2nbins,TH2min)  
+TH2FexcludedProphits_collector = generate2DMap_ExcludedHits(TH2nbins,TH2min)
+VFATMaskBook = {}
 THSanityChecks = {'Occupancy':{}, 
                   'NHits':{},
                   'PropagationError':{},
@@ -111,7 +118,7 @@ THSanityChecks['Occupancy'].setdefault('BeforeMatching',{'Reco':ROOT.TH2F("RecoH
 for t_re in [-1,1]:
     for t_la in [1,2]:
         for t_ch in range(1,37):
-            ch_id = ReChLa2chamberName(t_re,t_ch,t_la)
+            ch_id = getChamberName(t_re,t_ch,t_la)
             THSanityChecks['CLS']['beforematching'].setdefault(ch_id,{})
             THSanityChecks['CLS']['aftermatching'].setdefault(ch_id,{})
             THSanityChecks['pt'].setdefault(ch_id,{})
@@ -209,21 +216,25 @@ for fl in files:
 
 # Disabling them all branches
 chain.SetBranchStatus("*",0)
-branchList=["event_eventNumber","event_lumiBlock","event_runNumber","gemRecHit_region", "gemRecHit_chamber", "gemRecHit_layer", "gemRecHit_etaPartition", "gemRecHit_g_r", "gemRecHit_loc_x", "gemRecHit_loc_y", "gemRecHit_g_x", "gemRecHit_g_y", "gemRecHit_g_z", "gemRecHit_g_phi", "gemRecHit_firstClusterStrip", "gemRecHit_cluster_size", "mu_propagated_region", "mu_propagated_chamber", "mu_propagated_layer", "mu_propagated_etaP", "mu_propagated_Outermost_z",  "mu_propagated_isME11", "mu_propagatedGlb_r", "mu_propagatedLoc_x", "mu_propagatedLoc_y", "mu_propagatedGlb_x", "mu_propagatedGlb_y", "mu_propagatedGlb_z", "mu_propagatedGlb_phi", "mu_propagatedGlb_errR", "mu_propagatedGlb_errPhi", "mu_propagatedLoc_dirX", "mu_propagatedLoc_dirY", "mu_propagatedLoc_dirZ", "mu_propagated_pt", "mu_propagated_isGEM", "mu_propagated_TrackNormChi2", "mu_propagated_nME1hits", "mu_propagated_nME2hits", "mu_propagated_nME3hits", "mu_propagated_nME4hits","mu_propagated_station","gemRecHit_station","mu_propagated_isME21"]#,"mu_propagated_ME11Chamber","mu_propagated_ME11Endcap"]
+branchList=["event_eventNumber","event_lumiBlock","event_runNumber","gemOHStatus_station","gemOHStatus_region","gemOHStatus_chamber","gemOHStatus_layer","gemOHStatus_VFATMasked", "gemOHStatus_VFATZS", "gemOHStatus_VFATMissing","gemOHStatus_errors","gemOHStatuswarnings", "gemRecHit_region", "gemRecHit_chamber", "gemRecHit_layer", "gemRecHit_etaPartition", "gemRecHit_g_r", "gemRecHit_loc_x", "gemRecHit_loc_y", "gemRecHit_g_x", "gemRecHit_g_y", "gemRecHit_g_z", "gemRecHit_g_phi", "gemRecHit_firstClusterStrip", "gemRecHit_cluster_size", "mu_propagated_region", "mu_propagated_chamber", "mu_propagated_layer", "mu_propagated_etaP", "mu_propagated_Outermost_z",  "mu_propagated_isME11", "mu_propagatedGlb_r", "mu_propagatedLoc_x", "mu_propagatedLoc_y", "mu_propagatedGlb_x", "mu_propagatedGlb_y", "mu_propagatedGlb_z", "mu_propagatedGlb_phi", "mu_propagatedGlb_errR", "mu_propagatedGlb_errPhi", "mu_propagatedLoc_dirX", "mu_propagatedLoc_dirY", "mu_propagatedLoc_dirZ", "mu_propagated_pt", "mu_propagated_isGEM", "mu_propagated_TrackNormChi2", "mu_propagated_nME1hits", "mu_propagated_nME2hits", "mu_propagated_nME3hits", "mu_propagated_nME4hits","mu_propagated_station","gemRecHit_station","mu_propagated_isME21"]
 # Enabling the useful ones
 for b in branchList: chain.SetBranchStatus(b,1)
 
 maxLS = {}
+processedEvents = {}
 chainEntries = chain.GetEntries()
 logging.info("############# Starting #############")
 logging.info(f"Analysing run(s): \t { [i for i in data_ranges] }")
 logging.info(f"Number of evts \t\t {float(chainEntries)/10**6:.2f} M\n")
 
 THSanityChecks['NEvts'].Fill(chainEntries)
+
 for chain_index,evt in enumerate(chain):
     EventNumber = evt.event_eventNumber
     LumiSection = evt.event_lumiBlock
     RunNumber = evt.event_runNumber
+
+    VFATMaskBook.setdefault( RunNumber,generateVFATMaskTH2(station=1))
     
     
     if chain_index % 8000 ==0: logging.info(f"{round( float(chain_index)/chainEntries*100,1 )}%\t{chain_index}")
@@ -231,10 +242,6 @@ for chain_index,evt in enumerate(chain):
     n_gemprop = len(evt.mu_propagated_chamber)
     n_gemrec = len(evt.gemRecHit_chamber)
     
-    ## Break on total number of evts
-    if chain_index > data_ranges[RunNumber]["nevts"] and data_ranges[RunNumber]["nevts"]> 0:
-        logging.debug(f"Exiting after reaching max number of events: {data_ranges[RunNumber]['nevts']}")
-        break
     ## Skip on LS
     if data_ranges[RunNumber]["lumisection"] != (0,0) and (LumiSection < data_ranges[RunNumber]["lumisection"][0] or LumiSection > data_ranges[RunNumber]["lumisection"][1]):
         logging.debug(f"Skipping, LS is {LumiSection} while range is {data_ranges[RunNumber]['lumisection']}")
@@ -256,6 +263,13 @@ for chain_index,evt in enumerate(chain):
     RecHit_Dict = {}
     PropHit_Dict = {}
 
+    processedEvents[RunNumber] = 1 if processedEvents.get(RunNumber) is None else processedEvents.get(RunNumber) + 1
+    maskedVFATs,VFATMaskBook[RunNumber] = unpackVFATStatus(evt,VFATMaskBook[RunNumber])
+    ## Break on total number of evts
+    if processedEvents[RunNumber] > data_ranges[RunNumber]["nevts"] and data_ranges[RunNumber]["nevts"]> 0:
+        logging.debug(f"Exiting after reaching max number of events: {data_ranges[RunNumber]['nevts']}")
+        break
+
     for RecHit_index in range(0,n_gemrec):
         station = evt.gemRecHit_station[RecHit_index]
         region = evt.gemRecHit_region[RecHit_index]
@@ -264,23 +278,23 @@ for chain_index,evt in enumerate(chain):
         etaP = evt.gemRecHit_etaPartition[RecHit_index]
         RecHitEtaPartitionID =  region*(100*chamber+10*layer+etaP)
         endcapKey = EndcapLayer2label(region,layer)
-        chamberID = ReChLa2chamberName(region,chamber,layer)
+        chamberID = getChamberName(region,chamber,layer,station)
+
+        
 
         if not parameters["doGE21"] and station == 2: 
-            #logging.debug(f"Skipping current rechit cause station = {station}")
+            logging.debug(f"Skipping current rechit cause station = {station}")
             continue
+
+        firstStrip = evt.gemRecHit_firstClusterStrip[RecHit_index]
+        CLS = evt.gemRecHit_cluster_size[RecHit_index]
+        rec_glb_r = evt.gemRecHit_g_r[RecHit_index]
+        rec_loc_x = evt.gemRecHit_loc_x[RecHit_index]
+        rec_loc_y = evt.gemRecHit_loc_y[RecHit_index]
         
         ## discard chambers that were kept OFF from the analysis
         if chamberID in data_ranges[RunNumber]["chamberOFF"].keys() and (LumiSection in data_ranges[RunNumber]["chamberOFF"][chamberID] or -1 in data_ranges[RunNumber]["chamberOFF"][chamberID] ):
             continue
-
-        rec_glb_r = evt.gemRecHit_g_r[RecHit_index]
-        rec_loc_x = evt.gemRecHit_loc_x[RecHit_index]
-        rec_loc_y = evt.gemRecHit_loc_y[RecHit_index]
-
-        if RecHitEtaPartitionID in data_ranges[RunNumber]["VFATOFF"]:
-            if propHit2VFAT(rec_glb_r,rec_loc_x,etaP,region,chamber) in data_ranges[RunNumber]["VFATOFF"][RecHitEtaPartitionID]:
-                continue
 
         if region == 1:
             if layer == 1:
@@ -301,19 +315,19 @@ for chain_index,evt in enumerate(chain):
         RecHit_Dict[RecHitEtaPartitionID]['glb_z'].append(evt.gemRecHit_g_z[RecHit_index])
         RecHit_Dict[RecHitEtaPartitionID]['glb_r'].append(rec_glb_r)
         RecHit_Dict[RecHitEtaPartitionID]['glb_phi'].append(evt.gemRecHit_g_phi[RecHit_index])
-        RecHit_Dict[RecHitEtaPartitionID]['firstStrip'].append(evt.gemRecHit_firstClusterStrip[RecHit_index])
-        RecHit_Dict[RecHitEtaPartitionID]['cluster_size'].append(evt.gemRecHit_cluster_size[RecHit_index])
+        RecHit_Dict[RecHitEtaPartitionID]['firstStrip'].append(firstStrip)
+        RecHit_Dict[RecHitEtaPartitionID]['cluster_size'].append(CLS)
 
         THSanityChecks['Occupancy']['BeforeMatching']['Reco'].Fill(evt.gemRecHit_g_x[RecHit_index],evt.gemRecHit_g_y[RecHit_index])
         THSanityChecks['Occupancy']['BeforeMatching'][endcapKey]['RecHits'].Fill(chamber,etaP)
         ## Fill CLS
         THSanityChecks['CLS']["beforematching"][chamberID]["All"].Fill(RecHit_Dict[RecHitEtaPartitionID]['cluster_size'][-1])
         THSanityChecks['CLS']["beforematching"][chamberID][etaP].Fill(RecHit_Dict[RecHitEtaPartitionID]['cluster_size'][-1])
-        
+        ## Fill Digis
         for j in range(0,RecHit_Dict[RecHitEtaPartitionID]['cluster_size'][-1]):
             strip = RecHit_Dict[RecHitEtaPartitionID]['firstStrip'][-1] + j
             THSanityChecks['RecHitperStrip'][endcapKey][chamber].Fill(strip,etaP)
-                    
+
     THSanityChecks['NHits']['BeforeMatching']['ML1'].Fill(ML1_NGEMRecoHits)
     THSanityChecks['NHits']['BeforeMatching']['ML2'].Fill(ML2_NGEMRecoHits)
     THSanityChecks['NHits']['BeforeMatching']['PL1'].Fill(PL1_NGEMRecoHits)
@@ -326,29 +340,22 @@ for chain_index,evt in enumerate(chain):
         chamber = evt.mu_propagated_chamber[PropHit_index]
         layer = evt.mu_propagated_layer[PropHit_index]
         etaP = evt.mu_propagated_etaP[PropHit_index]
-        
-        if not parameters["doGE21"] and station == 2: 
-            #logging.debug(f"Skipping current prophit cause station = {station}")
-            continue
-        if etaP >= 9: ## from CMSSW_12_2_1 GE21 demonstrator is also included in the propagated chambers
-            continue
-
+        chamberID = getChamberName(region,chamber,layer)
         PropHitChamberID = region*(100*chamber+10*layer+etaP)
         endcapKey = EndcapLayer2label(region,layer)
-
-        
-
         outermost_z = evt.mu_propagated_Outermost_z[PropHit_index]
-        # is_incoming = evt.mu_propagated_isincoming[PropHit_index]
 
-        if region == 1 and outermost_z < 0:
-            continue
-        if region == -1 and outermost_z > 0:
+        if not parameters["doGE21"] and station == 2: 
+            logging.debug(f"Skipping current prophit cause station = {station}")
+            continue       
+
+        if (region == 1 and outermost_z < 0) or (region == -1 and outermost_z > 0):
+            logging.debug(f"Skipping prophit due to inconsistent region vs outermost z")
             continue
 
-        chamberID = ReChLa2chamberName(region,chamber,layer)
         ## discard chambers that were kept OFF from the analysis
         if chamberID in data_ranges[RunNumber]["chamberOFF"].keys() and (LumiSection in data_ranges[RunNumber]["chamberOFF"][chamberID] or -1 in data_ranges[RunNumber]["chamberOFF"][chamberID] ):
+            logging.debug(f"Skipping prophit due to bad chamber HV")
             continue
 
         propHitFromME11 = bool(evt.mu_propagated_isME11[PropHit_index])
@@ -356,9 +363,19 @@ for chain_index,evt in enumerate(chain):
             PropHit_Dict.setdefault(PropHitChamberID,{'loc_x':[],'loc_y':[],'glb_x':[],'glb_y':[],'glb_z':[],'glb_r':[],'glb_phi':[],'pt':[],'etaP':[],'err_glb_r':[],'err_glb_phi':[],'Loc_dirX':[],'Loc_dirY':[],'Loc_dirZ':[],'mu_propagated_isME11':[],'mu_propagated_isGEM':[],'STA_Normchi2':[],'nME1Hits':[],'nME2Hits':[],'nME3Hits':[],'nME4Hits':[]})
             prop_glb_r = evt.mu_propagatedGlb_r[PropHit_index]
             prop_loc_x = evt.mu_propagatedLoc_x[PropHit_index]
-
+            propVFAT = propHit2VFAT(prop_glb_r,prop_loc_x,etaP)
+            
             if PropHitChamberID in data_ranges[RunNumber]["VFATOFF"]:
-                if propHit2VFAT(prop_glb_r,prop_loc_x,etaP,region,chamber) in data_ranges[RunNumber]["VFATOFF"][PropHitChamberID]:
+                if propVFAT in data_ranges[RunNumber]["VFATOFF"][PropHitChamberID]:
+                    continue
+            
+            badVFATs =  maskedVFATs.get(chamberID)            
+            if badVFATs is not None:
+                if propVFAT in badVFATs:
+                    logging.debug(f"On {chamberID} propVFAT {propVFAT} found in MaskedVFATs {badVFATs}. Skipping")
+                    continue
+                elif VFATcompatibleHit(badVFATs,prop_glb_r,prop_loc_x,etaP):
+                    logging.debug(f"On {chamberID} proVFAT {propVFAT} compatible with MaskedVFATs {badVFATs}. Skipping")
                     continue
 
             
@@ -377,8 +394,6 @@ for chain_index,evt in enumerate(chain):
             PropHit_Dict[PropHitChamberID]['pt'].append(evt.mu_propagated_pt[PropHit_index])
             PropHit_Dict[PropHitChamberID]['etaP'].append(etaP)
             PropHit_Dict[PropHitChamberID]['mu_propagated_isME11'].append(evt.mu_propagated_isME11[PropHit_index])
-            #PropHit_Dict[PropHitChamberID]['ME11Chamber'].append(evt.mu_propagated_ME11Chamber[PropHit_index])
-            #PropHit_Dict[PropHitChamberID]['ME11Endcap'].append(evt.mu_propagated_ME11Endcap[PropHit_index])
             PropHit_Dict[PropHitChamberID]['mu_propagated_isGEM'].append(evt.mu_propagated_isGEM[PropHit_index])
             PropHit_Dict[PropHitChamberID]['STA_Normchi2'].append(evt.mu_propagated_TrackNormChi2[PropHit_index])            
             PropHit_Dict[PropHitChamberID]['nME1Hits'].append(evt.mu_propagated_nME1hits[PropHit_index])
@@ -390,7 +405,6 @@ for chain_index,evt in enumerate(chain):
             THSanityChecks['Occupancy']['BeforeMatching'][endcapKey]['PropHits'].Fill(chamber,etaP)
             THSanityChecks['etaP_vs_pt'].Fill(PropHit_Dict[PropHitChamberID]['etaP'][-1]-1,10*pt_index(evt.mu_propagated_pt[PropHit_index]))
             THSanityChecks['STA_Normchi2'].Fill(evt.mu_propagated_TrackNormChi2[PropHit_index])
-
 
             if chamber % 2 == 0:
                 THSanityChecks['Occupancy']['BeforeMatching']['PropLocalLong'].Fill(evt.mu_propagatedLoc_x[PropHit_index],evt.mu_propagatedLoc_y[PropHit_index])
@@ -424,7 +438,7 @@ for chain_index,evt in enumerate(chain):
         
         region,chamber,layer,eta = getInfoFromEtaID(etaPartitionID)
         endcapTag = EndcapLayer2label(region,layer)
-        current_chamber_ID = ReChLa2chamberName(region,chamber,layer)
+        current_chamber_ID = getChamberName(region,chamber,layer)
         
         PropHitonEta = PropHit_Dict[etaPartitionID]
 
@@ -455,7 +469,7 @@ for chain_index,evt in enumerate(chain):
                 EfficiencyDictGlobal['glb_phi'][etaPartitionID][pt_index(PropHitonEta['pt'][index])]['den'] += 1
                 EfficiencyDictGlobal['glb_rdphi'][etaPartitionID][pt_index(PropHitonEta['pt'][index])]['den'] += 1
                 
-                VFAT_propagated = propHit2VFAT(PropHitonEta['glb_r'][index],PropHitonEta['loc_x'][index],eta,region,chamber)
+                VFAT_propagated = propHit2VFAT(PropHitonEta['glb_r'][index],PropHitonEta['loc_x'][index],eta)
                 EfficiencyDictVFAT['glb_phi'][endcapTag][current_chamber_ID][VFAT_propagated]['den'] += 1
                 EfficiencyDictVFAT['glb_rdphi'][endcapTag][current_chamber_ID][VFAT_propagated]['den'] += 1
 
@@ -594,7 +608,7 @@ for chain_index,evt in enumerate(chain):
 
                 EfficiencyDictGlobal[matchingVar][etaPartitionID][pt_index(PropHitonEta['pt'][prop_hit_index])]['num'] += 1
                 
-                VFAT_propagated = propHit2VFAT(PropHitonEta['glb_r'][prop_hit_index],PropHitonEta['loc_x'][prop_hit_index],eta,region,chamber)
+                VFAT_propagated = propHit2VFAT(PropHitonEta['glb_r'][prop_hit_index],PropHitonEta['loc_x'][prop_hit_index],eta)
                 EfficiencyDictVFAT[matchingVar][endcapTag][current_chamber_ID][VFAT_propagated]['num'] += 1
 
                 angle_index = int( np.sqrt(PropHitonEta['Loc_dirX'][prop_hit_index]**2 + PropHitonEta['Loc_dirY'][prop_hit_index]**2) * 20)
@@ -704,7 +718,9 @@ for chain_index,evt in enumerate(chain):
     THSanityChecks['NHits']['AfterMatching']['PL2'].Fill(PL2_N_MatchedGEMRecoHits)
 ## End of the evts loop
 
-
+for run in VFATMaskBook:
+    for endcapTag,plot in VFATMaskBook[run].items():
+        VFATMaskBook[run][endcapTag].Scale(1/processedEvents[run])
 TH2Fresidual_collector = fillPlot2DResidualContainer(TH2Fresidual_collector,matching_variables,TH2nbins)
 
 logging.info(f"--- {round(time.time() - start_time,2)} seconds ---")
@@ -723,20 +739,26 @@ subprocess.call(["mkdir", "-p", "./Output/PFA_Analyzer_Output/Plot/"+parameters[
 ### Masking
 for run in data_ranges:
     data_ranges[run]["lumisection"] = (data_ranges[run]["lumisection"][0],maxLS[run])
-    masking_dict_key = [f'{run}_chamberOFF',f'{run}_VFATOFF',f'{run}_ExclusionSummary']
+    masking_dict_key = [f'{run}_chamberOFF',f'{run}_VFATOFF',f'{run}_ExclusionSummary',f"{run}_VFATMaskBook"]
     for k in masking_dict_key:
-        TH1MetaData[k]=setUpCanvas(k,1200,1200)
+        TH1MetaData[k]=setUpCanvas(k,2000,2000)
         TH1MetaData[k].Divide(2,2)
 
     OFFChambers_plots = ChambersOFFHisto(data_ranges[run]["chamberOFF"],data_ranges[run]["lumisection"][0],data_ranges[run]["lumisection"][1])
     for counter,plot in enumerate(OFFChambers_plots):
         TH1MetaData[f'{run}_chamberOFF'].cd(counter+1)
+        ROOT.gPad.SetGrid()
         plot.Draw()
 
     OFFVFATs_plots = VFATOFFHisto(data_ranges[run]["VFATOFF"])
     for counter,plot in enumerate(OFFVFATs_plots):
         TH1MetaData[f'{run}_VFATOFF'].cd(counter+1)
         plot.Draw("COLZ")
+
+    for counter,key in enumerate(VFATMaskBook[RunNumber].keys()):
+        pad = TH1MetaData[f'{run}_VFATMaskBook'].cd(counter+1)
+        ROOT.gPad.SetGrid()
+        VFATMaskBook[RunNumber][key].Draw("COLZ TEXT0")
 
     GE11Discarded_plots = GE11DiscardedSummary(data_ranges[run]["chamberOFF"],data_ranges[run]["lumisection"][0],data_ranges[run]["lumisection"][1],data_ranges[run]["VFATOFF"])
     for counter,plot in enumerate(GE11Discarded_plots):
@@ -832,7 +854,7 @@ for when in ["beforematching","aftermatching"]:
         for l in [1,2]:
             endcapTag = EndcapLayer2label(r,l)   
             for ch in range(1,37):
-                ch_id = ReChLa2chamberName(r,ch,l)
+                ch_id = getChamberName(r,ch,l)
                 for eta in list(range(1,9))+ ["All"]:
                     writeToTFile(OutF,THSanityChecks['CLS'][when][ch_id][eta],f"SanityChecks/CLS/{when}/{endcapTag}/{ch_id}")
 
@@ -934,7 +956,7 @@ for matchingVar in matching_variables:
             writeToTFile(OutF,efficiencyByEta_All,"Efficiency/"+matchingVar+"/ByEta/"+endcapTag+"/")
 
             for t_ch in range(1,37):
-                current_chamber_ID = ReChLa2chamberName(r,t_ch,l)
+                current_chamber_ID = getChamberName(r,t_ch,l)
                 writeToTFile(OutF,generate2DEfficiencyPlotbyVFAT(EfficiencyDictVFAT[matchingVar],current_chamber_ID),"Efficiency/"+matchingVar+"/ByVFAT/"+endcapTag+"/"+current_chamber_ID)
                 writeToTFile(OutF,generate1DEfficiencyPlotbyVFAT(EfficiencyDictVFAT[matchingVar],current_chamber_ID),"Efficiency/"+matchingVar+"/ByVFAT/"+endcapTag+"/"+current_chamber_ID)
                 for t_eta in list(range(1,9)) + ["All"]:
@@ -974,7 +996,7 @@ for matchingVar in matching_variables:
         
         matchedRecHit = sum([subDict[k]['num'] for k in subDict.keys()])
         propHit = sum([subDict[k]['den'] for k in subDict.keys()])
-        chID = ReChLa2chamberName(region,chamber,layer)
+        chID = getChamberName(region,chamber,layer)
 
         AVG_CLS = THSanityChecks['CLS']["aftermatching"][chID][eta].GetMean()
         AVG_pt = THSanityChecks['pt'][chID][eta].GetMean()
@@ -997,7 +1019,7 @@ if parameters["DLE"]:
 
         matchedRecHit = sum([subDict[k]['num'] for k in subDict.keys()])
         propHit = sum([subDict[k]['den'] for k in subDict.keys()])
-        chID = ReChLa2chamberName(region,chamber,layer)
+        chID = getChamberName(region,chamber,layer)
         tempList_byDLE.append([chID,region,chamber,layer,eta,matchedRecHit,propHit])
     data_byDLE = pd.DataFrame(tempList_byDLE,columns=['chamberID',"region","chamber","layer","etaPartition","matchedRecHit","propHit"])
     data_byDLE.to_csv('./Output/PFA_Analyzer_Output/CSV/'+parameters["outputname"]+'/MatchingSummary_glb_rdphi_byDLE.csv', index=False)
