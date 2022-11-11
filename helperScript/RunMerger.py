@@ -34,7 +34,7 @@ DLE = args.DLE
 run_list = [GetRunNumber(i) for i in args.inputs]
 
 
-print("\n########\nRun(s) to be merged:\t\t\t {str(run_list)[1:-1]}")
+print(f"\n########\nRun(s) to be merged:\t\t\t {str(run_list)[1:-1]}")
 
 ## safety check the exclusion list
 if type(exclusion_dict) != dict:
@@ -85,7 +85,7 @@ if DLE: print(f"Merging {len(df_list_byDLE)} files for efficiency by DLE")
 for region in [-1,1]:
     for layer in [1,2]:
         for ch in range(1,37):
-            chamberID = ReChLa2chamberName(region,ch,layer)
+            chamberID = getChamberName(region,ch,layer)
             if chamberID in exclusion_dict.keys() and -1 in exclusion_dict[chamberID]:
                 print(f"{chamberID}: completely excluded from the merge")
                 continue
@@ -100,7 +100,7 @@ for region in [-1,1]:
                 for file_index,df in enumerate(df_list):
                     if DLE: df_byDLE = df_list_byDLE[file_index]
                     if chamberID in exclusion_dict.keys() and int(run_list[file_index]) in exclusion_dict[chamberID]:
-                        print("ChamberID {chamberID}\t{args.inputs[file_index]}\tExclusion DICT {exclusion_dict[chamberID]}")
+                        # print(f"Skipping {chamberID} from\t{args.inputs[file_index]}")
                         continue
 
                     temp_df = df[ (df['chamberID']==chamberID) & (df['etaPartition']==eta)]
@@ -123,7 +123,7 @@ for region in [-1,1]:
 
                 for file_index,df_byVFAT in enumerate(df_list_byVFAT):
 
-                    if chamberID in exclusion_dict.keys() and run_list[file_index] in exclusion_dict[chamberID]:
+                    if chamberID in exclusion_dict.keys() and int(run_list[file_index]) in exclusion_dict[chamberID]:
                         continue
                     temp_df_byVFAT = df_byVFAT[ (df_byVFAT['chamberID']==chamberID) & (df_byVFAT['VFATN']==VFATN)]
 
@@ -158,5 +158,5 @@ whichrunsfile = "./Output/PFA_Analyzer_Output/CSV/"+output+"/RunMerged.txt"
 with open(whichrunsfile, "w") as outfile:
     outfile.write("\n".join(args.inputs))
 
-print(f"Merge stored in\t\t\t"+"./Output/PFA_Analyzer_Output/CSV/{output}")
+print(f"Merge stored in\t\t\t./Output/PFA_Analyzer_Output/CSV/{output}")
 print(f"Exclusion Dict stored in\t./Output/PFA_Analyzer_Output/CSV/{output}/Exclusion_Dict.json")
