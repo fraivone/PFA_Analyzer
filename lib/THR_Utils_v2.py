@@ -24,7 +24,8 @@ def GetCHDict(chamber_ID,run=348832):
         OHLink = int(tupl[2])
         fed = 1466 + crate
         
-        file_path = "/afs/cern.ch/user/f/fivone/Test/runParameterGEM/run"+str(run)+"/fed%d" % fed + "-amc%02d" % amc +"_ConfigInfo.json"
+        #file_path = "/afs/cern.ch/user/f/fivone/Test/runParameterGEM/run"+str(run)+"/fed%d" % fed + "-amc%02d" % amc +"_ConfigInfo.json"
+        file_path = "/eos/cms/store/group/dpg_gem/comm_gem/P5_Commissioning/2022/config/global/THR_Latency/run"+str(run)+"/fed%d" % fed + "-amc%02d" % amc +"_ConfigInfo.json"
 
         try:
                 with open(file_path) as json_file:
@@ -102,8 +103,5 @@ def GetOverallChamberThreshold(chamberID,run=357329):
         
 
 if __name__ == "__main__":
-        chamber="GE11-P-18L2-L"
-        for v in range(24):
-                print(f"VFAT: {v}\tLatency: {GetVFAT_LATENCY(chamber,v,357329)}\tTHR: {GetVFAT_THRDAC(chamber,v,357329)}")
         pass
 
