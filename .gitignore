@@ -1,0 +1,8 @@
+Output/Plot/*
+Output/PFA_Analyzer_Output/*
+CondorSub/Logs/*
+CondorSub/JobFiles
+CondorSub/*DAG*
+CondorSub/fivone.cc
+config/3*
+ExcludeMe/*txt
