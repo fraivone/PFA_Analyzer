@@ -90,7 +90,7 @@ for re,la in [(-1,1),(1,1),(-1,2),(1,2)]:
 
 
     for chamber in range(1,37):
-        current_chamber_ID = ReChLa2chamberName(re,chamber,la)
+        current_chamber_ID = getChamberName(re,chamber,la)
         current_output_folder = outputFolder+"/"+endcapTag + "/" + current_chamber_ID +"/"
         CreatEOSFolder(current_output_folder)
 
