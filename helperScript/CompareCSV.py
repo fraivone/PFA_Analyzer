@@ -71,11 +71,11 @@ if plot_short:
             line[1] = line[1].replace(" ","")
             chamber_short = int(line[1][-2:])
             if line[3] == '':
-                chamberNames_withShort.append(ReChLa2chamberName(region_short,chamber_short,1))
-                chamberNames_withShort.append(ReChLa2chamberName(region_short,chamber_short,2))
+                chamberNames_withShort.append(getChamberName(region_short,chamber_short,1))
+                chamberNames_withShort.append(getChamberName(region_short,chamber_short,2))
             else:
                 layer_short = int(line[3])
-                chamberNames_withShort.append(ReChLa2chamberName(region_short,chamber_short,layer_short))
+                chamberNames_withShort.append(getChamberName(region_short,chamber_short,layer_short))
 
             if args.verbose:
                 print(f"{chamberNames_withShort[-1]}\t has a short")
@@ -94,7 +94,7 @@ Text_Dict = {}
 TGraph_THR_Dict = {}
 
 ## Output files
-folder_name = "/eos/user/f/fivone/www/run"+output
+folder_name = "/eos/user/f/fivone/www/P5_Operations/Run3/RunMerge/"+output
 print(f"Creating Folder")
 CreatEOSFolder(folder_name)
 
@@ -116,7 +116,7 @@ for re,la in [(-1,1),(1,1),(-1,2),(1,2)]:
         ChamberWQC8_THR[label].SetLineColor(ROOT.kGreen+3)
 
 ## ROOTStyle
-color = [ROOT.TColor.GetColorPalette(255/(len(inputs))*(i)) for i in range(len(inputs))]
+color = [ROOT.TColor.GetColorPalette( int(255/(len(inputs))*(i))) for i in range(len(inputs))]
 c2 = setUpCanvas("Comparison",1400,900)
 c2.Divide(2,2)
 
@@ -141,7 +141,7 @@ for index,file_path in enumerate(inputs):
 
             x,y,exl,exh,eyl,eyh = [],[],[],[],[],[]
             for chamber in range(1,37):
-                chamberID = ReChLa2chamberName(re,chamber,la)
+                chamberID = getChamberName(re,chamber,la)
                 matched,propagated,efficiency_CL68 = ChamberEfficiencyFromCSV(file_path,chamberID)
                 if propagated == 0:
                     continue
@@ -196,7 +196,7 @@ if enable_THR:
         print(f"{label}")
         for chamber in range(1,37):
             
-            chamberID = ReChLa2chamberName(region,chamber,layer)
+            chamberID = getChamberName(region,chamber,layer)
             thr = GetOverallChamberThreshold(chamberID,run=357329)
             graph_point = thr
             if graph_point is  None:
@@ -217,7 +217,7 @@ for index,key in enumerate(Multigraph_Dict.keys()):
     virtual_Pad = c2.cd(index+1)
     virtual_Pad.SetGrid()    
     Multigraph_Dict[key].Draw("0AEP")        
-    CMS_lumi.CMS_lumi(virtual_Pad,  0,  0,"1.83 fb ^{-1} (13.6 TeV)")
+    CMS_lumi.CMS_lumi(virtual_Pad,  0,  0,"(13.6 TeV)")
 
     latex = ROOT.TLatex()
     latex.SetNDC()
@@ -228,7 +228,7 @@ for index,key in enumerate(Multigraph_Dict.keys()):
     latex.SetTextAlign(21) 
     latex.SetTextSize(0.045)    
     latex.DrawLatex(.5,0.909,Text_Dict[key])
-    leg_list[key] = ROOT.TLegend(0.11,0.11,0.5,0.25+0.03*(len(inputs)-1 + items_in_the_legend))
+    leg_list[key] = ROOT.TLegend()
     leg_list[key].SetBorderSize(2)
     leg_list[key].SetFillStyle(1)
     for j,file_path in enumerate(inputs):
@@ -251,7 +251,7 @@ c2.Update()
 
 
 
-outputPath = folder_name+"/"+output+".pdf"
+outputPath = folder_name+"/Merged.pdf"
 c2.SaveAs(outputPath)
 Convert2png(outputPath)
 print(f"Your ouput \t{outputPath}")
