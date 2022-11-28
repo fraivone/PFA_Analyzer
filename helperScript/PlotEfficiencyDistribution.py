@@ -15,14 +15,14 @@ parser = argparse.ArgumentParser(
         )
 
 parser.add_argument('--inputs', type=str , help="Tag of the runs to be merged",required=True,nargs='*')
-parser.add_argument('--output', type=str , help="Output file name",required=False)
+parser.add_argument('--output', type=str , help="Output file name",required=True)
 parser.add_argument('--labels', type=str , help="Label with which the runs should be listed in the legend (according to inputs order). If not provided, input names will be used",required=False,nargs='*')
 parser.add_argument('--batch', default=False, action='store_true',help="ROOT in batch mode",required=False)
 
 chamber_with_short =[] # ["GE11-P-07L2-S", "GE11-P-09L2-S", "GE11-P-10L2-L", "GE11-P-12L1-L", "GE11-P-14L1-L", "GE11-P-15L1-S", "GE11-P-15L2-S", "GE11-P-18L1-L", "GE11-P-24L2-L", "GE11-P-34L2-L", "GE11-P-36L1-L", "GE11-P-36L2-L", "GE11-M-05L2-S", "GE11-M-05L1-S", "GE11-M-06L1-L", "GE11-M-07L1-S", "GE11-M-10L2-L", "GE11-M-17L2-S", "GE11-M-19L2-S", "GE11-M-21L1-S", "GE11-M-23L1-S", "GE11-M-29L1-S", "GE11-M-30L1-L", "GE11-M-31L2-S", "GE11-M-33L1-S", "GE11-M-35L1-S"] 
 
 args = parser.parse_args()
-inputs = ["./Output/PFA_Analyzer_Output/CSV/"+i+"/" for i in args.inputs]
+inputs = [f"{OUTPUT_PATH}/PFA_Analyzer_Output/CSV/"+i+"/" for i in args.inputs]
 output = args.output
 label_list = args.labels if args.labels is not None else args.inputs
 
@@ -95,5 +95,5 @@ for h in [hs,hCumulative]:
     leg.Draw()
     c2.Modified()
     c2.Update()
-    c2.SaveAs("./Output/EfficiencyDistribution/"+h.GetTitle()+".pdf")
-    print("Your ouput \t./Output/EfficiencyDistribution/{h.GetTitle()}.pdf")
+    c2.SaveAs(f"{OUTPUT_PATH}/EfficiencyDistribution/"+h.GetTitle()+".pdf")
+    print(f"Your ouput \t./Output/EfficiencyDistribution/{h.GetTitle()}.pdf")

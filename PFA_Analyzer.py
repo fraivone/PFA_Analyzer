@@ -728,12 +728,12 @@ logging.info(f"--- {round(time.time() - start_time,2)} seconds ---")
 
 ## Storing the results
 # matchingFile.Write()
-OutF = ROOT.TFile("./Output/PFA_Analyzer_Output/ROOT_File/"+parameters["outputname"]+".root","RECREATE")
+OutF = ROOT.TFile(OUTPUT_PATH + "/PFA_Analyzer_Output/ROOT_File/"+parameters["outputname"]+".root","RECREATE")
 
-subprocess.call(["mkdir", "-p", "./Output/PFA_Analyzer_Output/CSV/"+parameters["outputname"]])
-subprocess.call(["mkdir", "-p", "./Output/PFA_Analyzer_Output/CSV/"+parameters["outputname"]])
-subprocess.call(["mkdir", "-p", "./Output/PFA_Analyzer_Output/Plot/"+parameters["outputname"]+"/"+"glb_phi/"])
-subprocess.call(["mkdir", "-p", "./Output/PFA_Analyzer_Output/Plot/"+parameters["outputname"]+"/"+"glb_rdphi/"])
+subprocess.call(["mkdir", "-p", OUTPUT_PATH + "/PFA_Analyzer_Output/CSV/"+parameters["outputname"]])
+subprocess.call(["mkdir", "-p", OUTPUT_PATH + "/PFA_Analyzer_Output/CSV/"+parameters["outputname"]])
+subprocess.call(["mkdir", "-p", OUTPUT_PATH + "/PFA_Analyzer_Output/Plot/"+parameters["outputname"]+"/"+"glb_phi/"])
+subprocess.call(["mkdir", "-p", OUTPUT_PATH + "/PFA_Analyzer_Output/Plot/"+parameters["outputname"]+"/"+"glb_rdphi/"])
 
 
 ### Masking
@@ -937,19 +937,19 @@ for matchingVar in matching_variables:
                 plot_obj.Draw("COLZ TEXT45")
                 c1.Modified()
                 c1.Update()
-                c1.SaveAs("./Output/PFA_Analyzer_Output/Plot/"+parameters["outputname"]+"/"+matchingVar+"/"+plot_obj.GetTitle()+".pdf")
+                c1.SaveAs(OUTPUT_PATH + "/PFA_Analyzer_Output/Plot/"+parameters["outputname"]+"/"+matchingVar+"/"+plot_obj.GetTitle()+".pdf")
             
             Summary.Draw("APE")
             c1.Modified()
             c1.Update()
-            c1.SaveAs("./Output/PFA_Analyzer_Output/Plot/"+parameters["outputname"]+"/"+matchingVar+"/"+Summary.GetTitle()+".pdf")
+            c1.SaveAs(OUTPUT_PATH + "/PFA_Analyzer_Output/Plot/"+parameters["outputname"]+"/"+matchingVar+"/"+Summary.GetTitle()+".pdf")
 
             c2.cd()
             endcapVFAT2D = generate2DEfficiencyPlotbyVFAT(EfficiencyDictVFAT[matchingVar],endcapTag)
             endcapVFAT2D.Draw("COLZ TEXT")
             c2.Modified()
             c2.Update()
-            c2.SaveAs("./Output/PFA_Analyzer_Output/Plot/"+parameters["outputname"]+"/"+matchingVar+"/"+endcapVFAT2D.GetTitle()+".pdf")
+            c2.SaveAs(OUTPUT_PATH + "/PFA_Analyzer_Output/Plot/"+parameters["outputname"]+"/"+matchingVar+"/"+endcapVFAT2D.GetTitle()+".pdf")
 
             writeToTFile(OutF,efficiencyByEta_Short,"Efficiency/"+matchingVar+"/ByEta/"+endcapTag+"/")
             writeToTFile(OutF,efficiencyByEta_Long,"Efficiency/"+matchingVar+"/ByEta/"+endcapTag+"/")
@@ -1009,10 +1009,10 @@ for matchingVar in matching_variables:
                 tempList_byVFAT.append([chID,endcap_key,VFATN,subDict[VFATN]['num'],subDict[VFATN]['den']])
 
     data = pd.DataFrame(tempList,columns=['chamberID',"region","chamber","layer","etaPartition","matchedRecHit","propHit","AVG_CLS","AVG_pt"])
-    data.to_csv('./Output/PFA_Analyzer_Output/CSV/'+parameters["outputname"]+'/MatchingSummary_'+matchingVar+'.csv', index=False)
+    data.to_csv(OUTPUT_PATH + '/PFA_Analyzer_Output/CSV/'+parameters["outputname"]+'/MatchingSummary_'+matchingVar+'.csv', index=False)
     
     data_byVFAT = pd.DataFrame(tempList_byVFAT,columns=['chamberID',"EndcapTag","VFATN","matchedRecHit","propHit"])
-    data_byVFAT.to_csv('./Output/PFA_Analyzer_Output/CSV/'+parameters["outputname"]+'/MatchingSummary_'+matchingVar+'_byVFAT.csv', index=False)
+    data_byVFAT.to_csv(OUTPUT_PATH + '/PFA_Analyzer_Output/CSV/'+parameters["outputname"]+'/MatchingSummary_'+matchingVar+'_byVFAT.csv', index=False)
 if parameters["DLE"]:
     for etaPID,subDict in EfficiencyDictLayer['glb_rdphi'].items():
         region,chamber,layer,eta = getInfoFromEtaID(etaPID)
@@ -1022,11 +1022,11 @@ if parameters["DLE"]:
         chID = getChamberName(region,chamber,layer)
         tempList_byDLE.append([chID,region,chamber,layer,eta,matchedRecHit,propHit])
     data_byDLE = pd.DataFrame(tempList_byDLE,columns=['chamberID',"region","chamber","layer","etaPartition","matchedRecHit","propHit"])
-    data_byDLE.to_csv('./Output/PFA_Analyzer_Output/CSV/'+parameters["outputname"]+'/MatchingSummary_glb_rdphi_byDLE.csv', index=False)
+    data_byDLE.to_csv(OUTPUT_PATH + '/PFA_Analyzer_Output/CSV/'+parameters["outputname"]+'/MatchingSummary_glb_rdphi_byDLE.csv', index=False)
 
 OutF.Close()
 print(f"\n#############\nOUTPUT\n#############")
-print(f"\tCSVs in \t./Output/PFA_Analyzer_Output/CSV/{parameters['outputname']}")
-print(f"\tROOT_File \t ./Output/PFA_Analyzer_Output/ROOT_File/{parameters['outputname']}.root")
+print(f"\tCSVs in \t {OUTPUT_PATH}/PFA_Analyzer_Output/CSV/{parameters['outputname']}")
+print(f"\tROOT_File \t {OUTPUT_PATH}/PFA_Analyzer_Output/ROOT_File/{parameters['outputname']}.root")
 # print "\tMatchingTTree File \t"+"./Output/PFA_Analyzer_Output/ROOT_File/MatchingTree_"+outputname+".root"
-print(f"\tPlots in\t./Output/PFA_Analyzer_Output/Plot/{parameters['outputname']}")
+print(f"\tPlots in\t{OUTPUT_PATH}/PFA_Analyzer_Output/Plot/{parameters['outputname']}")

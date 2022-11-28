@@ -16,6 +16,8 @@ import time
 import logging
 
 
+OUTPUT_PATH = "/eos/user/f/fivone/PFA_Output/Output/"
+
 map_cutcode_to_quantity = {-1:"ErrPropR",
                            -2:"ErrPropPhi",
                            -3:"FiducialCuts",
@@ -1316,7 +1318,7 @@ def fillMatchingTreeArray(PropHitonEta,prop_hit_index,RecHitonEta,reco_hit_index
     return recHit_Matching,propHit_Matching
 
 def store4evtDspl(name,run,lumi,evt):
-    evtDspl_dir = "/afs/cern.ch/user/f/fivone/Test/Analyzer/Output/PFA_Analyzer_Output/EvtDspl/"
+    evtDspl_dir = OUTPUT_PATH + "/PFA_Analyzer_Output/EvtDspl/"
     with open(evtDspl_dir+name+".txt", 'a+') as f:
         f.write(str(run)+":"+str(lumi)+":"+str(evt)+"\n")
 
@@ -1418,8 +1420,12 @@ def VFATEfficiencyFromCSV(df):
                 print(Name+"\t"+str(VFATN)+"\t"+str(matched/prop))
 
 if __name__ == '__main__':
-    print("/afs/cern.ch/user/f/fivone/Test/Analyzer/Output/PFA_Analyzer_Output/CSV/357479_ZMu_pt_chi2_cut")
-    printEfficiencyFromCSV("/afs/cern.ch/user/f/fivone/Documents/test/Output/PFA_Analyzer_Output/CSV/MergedRuns_660uA")
+    for ch in ["GE11-M-02L1-L","GE11-M-02L2-L"]:
+        print(ch)
+        print("HV\tMatched\tPropagated\tCL68_Eff")
+        print(generateClopperPeasrsonInterval(50,60))
     # df = pd.read_csv("/afs/cern.ch/user/f/fivone/Test/Analyzer/Output/PFA_Analyzer_Output/CSV/357333_Express/MatchingSummary_glb_phi_byVFAT.csv")
     # VFATEfficiencyFromCSV(df)
     pass
+
+

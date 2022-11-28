@@ -25,9 +25,9 @@ parser.add_argument('--exclusion', type=json.loads,default={}, help="dictionary[
 parser.add_argument('--DLE', type=bool,default=False, help="Switch to true to merge Double Layer Efficiency csv data",required=False)
 
 args = parser.parse_args()
-inputs =  ["./Output/PFA_Analyzer_Output/CSV/"+i+"/MatchingSummary_glb_rdphi.csv" for i in args.inputs]
-inputs_byVFAT =  ["./Output/PFA_Analyzer_Output/CSV/"+i+"/MatchingSummary_glb_rdphi_byVFAT.csv" for i in args.inputs]
-inputs_byDLE =  ["./Output/PFA_Analyzer_Output/CSV/"+i+"/MatchingSummary_glb_rdphi_byDLE.csv" for i in args.inputs]
+inputs =  [f"{OUTPUT_PATH}/PFA_Analyzer_Output/CSV/"+i+"/MatchingSummary_glb_rdphi.csv" for i in args.inputs]
+inputs_byVFAT =  [f"{OUTPUT_PATH}/PFA_Analyzer_Output/CSV/"+i+"/MatchingSummary_glb_rdphi_byVFAT.csv" for i in args.inputs]
+inputs_byDLE =  [f"{OUTPUT_PATH}/PFA_Analyzer_Output/CSV/"+i+"/MatchingSummary_glb_rdphi_byDLE.csv" for i in args.inputs]
 exclusion_dict = args.exclusion
 output = args.output
 DLE = args.DLE
@@ -137,26 +137,26 @@ for region in [-1,1]:
 ## End of the loop over all eta partitions
 
 
-subprocess.call(["mkdir", "-p", "./Output/PFA_Analyzer_Output/CSV/"+output])
+subprocess.call(["mkdir", "-p", f"{OUTPUT_PATH}/PFA_Analyzer_Output/CSV/"+output])
 data = pd.DataFrame(tempList,columns=['chamberID',"region","chamber","layer","etaPartition","matchedRecHit","propHit"])
-data.to_csv("./Output/PFA_Analyzer_Output/CSV/"+output+'/MatchingSummary_glb_rdphi.csv', index=False)
+data.to_csv(f"{OUTPUT_PATH}/PFA_Analyzer_Output/CSV/"+output+'/MatchingSummary_glb_rdphi.csv', index=False)
 
 data_byVFAT = pd.DataFrame(tempList_byVFAT,columns=['chamberID',"region","chamber","layer","VFATN","matchedRecHit","propHit"])
-data_byVFAT.to_csv("./Output/PFA_Analyzer_Output/CSV/"+output+'/MatchingSummary_glb_rdphi_byVFAT.csv', index=False)
+data_byVFAT.to_csv(f"{OUTPUT_PATH}/PFA_Analyzer_Output/CSV/"+output+'/MatchingSummary_glb_rdphi_byVFAT.csv', index=False)
 
 if DLE:
     data_byDLE = pd.DataFrame(tempList_byDLE,columns=['chamberID',"region","chamber","layer","etaPartition","matchedRecHit","propHit"])
-    data_byDLE.to_csv("./Output/PFA_Analyzer_Output/CSV/"+output+'/MatchingSummary_glb_rdphi_byDLE.csv', index=False)
+    data_byDLE.to_csv(f"{OUTPUT_PATH}/PFA_Analyzer_Output/CSV/"+output+'/MatchingSummary_glb_rdphi_byDLE.csv', index=False)
 
 
 print()
-jsonFile = open("./Output/PFA_Analyzer_Output/CSV/"+output+"/Exclusion_Dict.json", "w")
+jsonFile = open(f"{OUTPUT_PATH}/PFA_Analyzer_Output/CSV/"+output+"/Exclusion_Dict.json", "w")
 json_data = json.dumps(exclusion_dict)
 jsonFile.write(json_data)
 
-whichrunsfile = "./Output/PFA_Analyzer_Output/CSV/"+output+"/RunMerged.txt"
+whichrunsfile = f"{OUTPUT_PATH}/PFA_Analyzer_Output/CSV/"+output+"/RunMerged.txt"
 with open(whichrunsfile, "w") as outfile:
     outfile.write("\n".join(args.inputs))
 
-print(f"Merge stored in\t\t\t./Output/PFA_Analyzer_Output/CSV/{output}")
-print(f"Exclusion Dict stored in\t./Output/PFA_Analyzer_Output/CSV/{output}/Exclusion_Dict.json")
+print(f"Merge stored in\t\t\t{OUTPUT_PATH}/PFA_Analyzer_Output/CSV/{output}")
+print(f"Exclusion Dict stored in\t{OUTPUT_PATH}/PFA_Analyzer_Output/CSV/{output}/Exclusion_Dict.json")

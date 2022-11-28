@@ -9,6 +9,8 @@ import argparse
 from argparse import RawTextHelpFormatter
 import matplotlib.pyplot as plt
 from scipy.stats import t as tstudent
+import time
+import subprocess
 
 parser = argparse.ArgumentParser(
         description='''Scripts that generates a dataframe containing efficiency per VFATs over input runs''',
@@ -47,11 +49,12 @@ def calcEfficiency(num,den):
 
 def generate(inputTags,save=True):
     mergedf = pd.DataFrame()
-    outputFolder = "./Output/"
+    outputFolder = f"{OUTPUT_PATH}/VFAT_Efficiency/{ time.strftime('%-y%m%d_%H%M')}"
+    subprocess.call(["mkdir", "-p", outputFolder])
 
     for tag in inputTags:
         run_number = GetRunNumber(tag) 
-        inputFile = "./Output/PFA_Analyzer_Output/CSV/"+tag+"/MatchingSummary_glb_rdphi_byVFAT.csv"
+        inputFile = f"{OUTPUT_PATH}/PFA_Analyzer_Output/CSV/{tag}/MatchingSummary_glb_rdphi_byVFAT.csv"
         df = pd.read_csv(inputFile, sep=',')
         df['efficiency'] = df.apply (lambda row: calcEfficiency(num_den(row)[0],num_den(row)[1])[0], axis=1)
         df['efficiencyError'] = df.apply (lambda row: calcEfficiency(num_den(row)[0],num_den(row)[1])[1], axis=1)
@@ -60,9 +63,12 @@ def generate(inputTags,save=True):
         mergedf = mergedf.append(df)
     
     if save:
-        for j in ["EndcapTag","chamber","layer","region"]:
+        for j in ["chamber","layer","region"]:
             mergedf.drop(labels=j,inplace=True,axis=1)
-        mergedf.to_csv(outputFolder+"/EfficiencyPerVFAT.csv", index=False)
+        mergedf.to_csv(f"{outputFolder}/EfficiencyPerVFAT.csv", index=False)
+        whichrunsfile = f"{outputFolder}/RunUsed.txt"
+        with open(whichrunsfile, "w") as outfile:
+            outfile.write("\n".join(inputTags))
 
     return mergedf
 
@@ -97,6 +103,4 @@ if __name__ == '__main__':
     args = parser.parse_args()
     inputTags = args.input
     df = generate(inputTags)
-    checkVFATOutliers(df)
-
-
+    # checkVFATOutliers(df)

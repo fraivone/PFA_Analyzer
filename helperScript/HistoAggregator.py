@@ -10,13 +10,18 @@ Plots that loops through the ROOT files and merges together the plots for a cert
 #tags = ["357482_ZMu_cut.root", "357613_ZMu_cut.root", "357333_ZMu_cut.root", "357610_ZMu_cut.root", "357612_ZMu_cut.root", "357611_ZMu_cut.root", "357438_ZMu_cut.root", "357542_ZMu_cut.root", "357330_ZMu_cut.root", "357440_ZMu_cut.root", "357401_ZMu_cut.root", "357442_ZMu_cut.root", "357479_ZMu_cut.root", "357332_ZMu_cut.root", "357329_ZMu_cut.root"]
 ## run 11 17 august
 #tags = ["357333_ZMu_pt_chi2_cut.root", "357613_ZMu_pt_chi2_cut.root", "357610_ZMu_pt_chi2_cut.root", "357482_ZMu_pt_chi2_cut.root", "357542_ZMu_pt_chi2_cut.root", "357330_ZMu_pt_chi2_cut.root", "357611_ZMu_pt_chi2_cut.root", "357440_ZMu_pt_chi2_cut.root", "357438_ZMu_pt_chi2_cut.root", "357612_ZMu_pt_chi2_cut.root", "357401_ZMu_pt_chi2_cut.root", "357442_ZMu_pt_chi2_cut.root", "357332_ZMu_pt_chi2_cut.root", "357479_ZMu_pt_chi2_cut.root", "357329_ZMu_pt_chi2_cut.root"]
-tags = ["357479_Prompt_pt_chi2_cut.root"]
+tags = ["352568_MinimumBias.root"]
 
-fileNames = [f"/afs/cern.ch/user/f/fivone/Documents/test/Output/PFA_Analyzer_Output/ROOT_File/{tag}" for tag in tags]
+fileNames = [f"{OUTPUT_PATH}/PFA_Analyzer_Output/ROOT_File/{tag}" for tag in tags]
 
 ROOT.gROOT.SetBatch(True)
 c1 = setUpCanvas("temp",1200,1200)
-OutF = ROOT.TFile("../Output/Plot/Aggregate.root","RECREATE")
+OutF = ROOT.TFile(OUTPUT_PATH+"/Plot/Aggregate.root","RECREATE")
+chamberList = ["GE11-M-02L2-L"]
+
+
+
+
 
 etas = [k for k in range(1,9)] + ["All"]
 endcaps = ["PL1_","PL2_","ML1_","ML2_",""]
@@ -25,26 +30,27 @@ CLSs = [1,2,3,4,5]
 ### Fill this one to add another histo
 ## {etaP} {endcaptag} and {chamber} will be replaced with value
 ## for each main entry, the search path must be unique
-histo_directives = {"Residual":
-                    {"Title":"Residual eta{etaP}",
-                     "Xaxis Title":"R#Delta#phi (cm)",
-                     "bins":120,
-                     "range":[-0.5,0.5],
-                     "search":"{chamber}*eta*{etaP}*Residual",
-                     "path":"Residuals/MatchingOn_glb_rdphi",
-                     "color":ROOT.kOrange+2,
-                     "linewidth":2
-                 },
-                    "ResidualY":
-                    {"Title":"Residual eta{etaP}",
-                     "Xaxis Title":"#Delta#LocalY (cm)",
-                     "bins":120,
-                     "range":[-10,10],
-                     "search":"{chamber}*eta*{etaP}*ResidualY",
-                     "path":"Residuals/MatchingOn_glb_rdphi",
-                     "color":ROOT.kOrange+2,
-                     "linewidth":2
-                 },
+histo_directives = {
+                #     "Residual":
+                #     {"Title":"Residual eta{etaP}",
+                #      "Xaxis Title":"R#Delta#phi (cm)",
+                #      "bins":120,
+                #      "range":[-0.5,0.5],
+                #      "search":"{chamber}*eta*{etaP}*Residual",
+                #      "path":"Residuals/MatchingOn_glb_rdphi",
+                #      "color":ROOT.kOrange+2,
+                #      "linewidth":2
+                #  },
+                #     "ResidualY":
+                #     {"Title":"Residual eta{etaP}",
+                #      "Xaxis Title":"#Delta#LocalY (cm)",
+                #      "bins":120,
+                #      "range":[-10,10],
+                #      "search":"{chamber}*eta*{etaP}*ResidualY",
+                #      "path":"Residuals/MatchingOn_glb_rdphi",
+                #      "color":ROOT.kOrange+2,
+                #      "linewidth":2
+                #  },
                     "CLSBeforeMatching":
                     {"Title":"CLS Before Matching eta{etaP}",
                      "Xaxis Title":"ClusterSize",
@@ -65,37 +71,37 @@ histo_directives = {"Residual":
                      "color":ROOT.kBlue+2,
                      "linewidth":2
                  },
-                    "NumberRecHitperEvt":
-                    {"Title":"Number of GEMRecoHits per Evt {endcaptag}",
-                     "Xaxis Title":"NGEM Rechits",
-                     "bins":200,
-                     "range":[0,200],
-                     "search":"{endcaptag}NRecoHitsPerEVT",
-                     "path":"SanityChecks/NHits/BeforeMatching",
-                     "color":ROOT.kRed+1,
-                     "linewidth":2
-                 },
-                    "LocalResidual":
-                    {"Title":"RecHit residual by local position: {size} chamber",
-                     "Xaxis Title":"Loc x (cm)",
-                     "Yaxis Title":"Loc y (cm)",
-                     "binx":200,
-                     "biny":200,
-                     "rangex":[-80,80],
-                     "rangey":[-80,80],
-                     "search":"{size}Chmbrs*res",
-                     "path":"Residuals/MatchingOn_glb_rdphi/2D_glb_rdphi"},
+                #     "NumberRecHitperEvt":
+                #     {"Title":"Number of GEMRecoHits per Evt {endcaptag}",
+                #      "Xaxis Title":"NGEM Rechits",
+                #      "bins":200,
+                #      "range":[0,200],
+                #      "search":"{endcaptag}NRecoHitsPerEVT",
+                #      "path":"SanityChecks/NHits/BeforeMatching",
+                #      "color":ROOT.kRed+1,
+                #      "linewidth":2
+                #  },
+                #     "LocalResidual":
+                #     {"Title":"RecHit residual by local position: {size} chamber",
+                #      "Xaxis Title":"Loc x (cm)",
+                #      "Yaxis Title":"Loc y (cm)",
+                #      "binx":200,
+                #      "biny":200,
+                #      "rangex":[-80,80],
+                #      "rangey":[-80,80],
+                #      "search":"{size}Chmbrs*res",
+                #      "path":"Residuals/MatchingOn_glb_rdphi/2D_glb_rdphi"},
 
-                    "ResidualCLS":
-                    {"Title":"Residuals ClusterSize{CLS}",
-                     "Xaxis Title":"R#Delta#phi (cm)",
-                     "bins":120,
-                     "range":[-0.5,0.5],
-                     "search":"Residual CLS {CLS}",
-                     "path":"Residuals/MatchingOn_glb_rdphi",
-                     "color":ROOT.kMagenta+1,
-                     "linewidth":2
-                 }
+                #     "ResidualCLS":
+                #     {"Title":"Residuals ClusterSize{CLS}",
+                #      "Xaxis Title":"R#Delta#phi (cm)",
+                #      "bins":120,
+                #      "range":[-0.5,0.5],
+                #      "search":"Residual CLS {CLS}",
+                #      "path":"Residuals/MatchingOn_glb_rdphi",
+                #      "color":ROOT.kMagenta+1,
+                #      "linewidth":2
+                #  }
                 }
 
 
@@ -173,7 +179,6 @@ def generateSkimmedDicts(histo_directives,mp):
         splitted_path = histo_directives[k]["path"].split("/")
         temp = mp
         for step in splitted_path:
-            print(k,step)
             temp = temp[step][1]
         skimmed_dicts[k] = temp
 
@@ -181,18 +186,20 @@ def generateSkimmedDicts(histo_directives,mp):
 
 TH1Plots = generateHisto(histo_directives)
 
-print(TH1Plots["ResidualCLS"].keys())
 for fn in tqdm(fileNames):
     print(fn)
+    print("Opening file")
     mp=Map_TFile(fn)
-
+    
+    print("File opened")
     skimmed_dicts = generateSkimmedDicts(histo_directives,mp[fn][1])
+    print("File skimmed")
 
     ## Fill histograms
     for k in histo_directives:
         search_tag = histo_directives[k]["search"]
         if "{chamber}" in search_tag and "{etaP}" in search_tag:
-            for ch in GE11_ChamberIDs():
+            for ch in chamberList:#GE11_ChamberIDs():
                 for eta in etas:
                     ### Only one hist found during the search
                     query_result_dict = getObjects(skimmed_dicts[k], search_tag.format(etaP=eta,chamber=ch) )
@@ -219,7 +226,8 @@ for fn in tqdm(fileNames):
         else:
             print("Filling Hist: TO BE IMPLEMENTED")
             input("press a key")
-
+    
+    del mp
 
 for k in TH1Plots:
     for subk,item in TH1Plots[k].items():
@@ -228,7 +236,7 @@ for k in TH1Plots:
         if type(item) == ROOT.TH2F: item.Draw("COLZ")
         c1.Modified()
         c1.Update()
-        c1.SaveAs(f"../Output/Plot/{item.GetTitle()}.png")
+        c1.SaveAs(fOUTPUT_PATH+"/Plot/{item.GetTitle()}.png")
         writeToTFile(OutF,item,k+"/")
 
 OutF.Close()

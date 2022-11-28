@@ -31,7 +31,7 @@ thr_folder_old = "/afs/cern.ch/user/f/fivone/Test/PFA_Analyzer/THR_Data/THR_ARM_
 
 args = parser.parse_args()
 enable_THR = args.THR
-inputs = ["./Output/PFA_Analyzer_Output/CSV/"+i+"/" for i in args.inputs]
+inputs = [f"{OUTPUT_PATH}/PFA_Analyzer_Output/CSV/{i}/" for i in args.inputs]
 run_numbers = [GetRunNumber(i) for i in inputs]
 output = args.output if args.output is not None else run_numbers[0]
 label_list = args.labels if args.labels is not None else args.inputs
@@ -59,7 +59,7 @@ if plot_short:
     if args.verbose: print(f"Fetching latest GE11 short status")
     cmd = " wget 'https://docs.google.com/spreadsheets/d/1m_OqvUmCpz6ge8rljOpFvAVRUmRCXPSGtEvBphsajBo/gviz/tq?tqx=out:csv&sheet=List of chambers with HV anomalies' -O Output/GE11Short.csv"
     os.system(cmd)
-    file1 = open('Output/GE11Short.csv', 'r')
+    file1 = open(f'{OUTPUT_PATH}/GE11Short.csv', 'r')
     Lines = file1.readlines()
     for line in Lines: 
         line = line.replace("\"","")
@@ -160,7 +160,6 @@ for index,file_path in enumerate(inputs):
                     MultiHist_Dict[label].SetBinContent(chamber,PRIMARY_YAXIS_MAX)
                 if plot_short and chamberID in QC8_THR:
                     ChamberWQC8_THR[label].SetBinContent(chamber,PRIMARY_YAXIS_MAX)
-
             TGraphError_Dict[label][index] = ROOT.TGraphAsymmErrors(    len(x),
                                                                         array.array('d',x),
                                                                         array.array('d',y),

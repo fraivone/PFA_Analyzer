@@ -45,11 +45,12 @@ parser.add_argument('--output', type=str , help="Output file name",required=Fals
 args = parser.parse_args()
 enable_THR = args.THR
 inputTag = args.input
-inputFile = "./Output/PFA_Analyzer_Output/CSV/"+inputTag+"/MatchingSummary_glb_rdphi_byVFAT.csv"
+inputFile = f"{OUTPUT_PATH}/PFA_Analyzer_Output/CSV/{inputTag}/MatchingSummary_glb_rdphi_byVFAT.csv"
 run_number = GetRunNumber(inputTag)
 output = args.output if args.output is not None else run_number
-outputFolder = "/eos/user/f/fivone/www/run"+output+"/VFAT/"
+outputFolder = f"/eos/user/f/fivone/www/P5_Operations/Run3/SingleRuns/{output}/VFAT/"
 CreatEOSFolder(outputFolder)
+print(outputFolder)
 
 OutF = ROOT.TFile(outputFolder+"Summary.root","RECREATE")
 Text_Dict = {}
