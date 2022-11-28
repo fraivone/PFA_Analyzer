@@ -114,10 +114,25 @@ def load_config(filepath,verbose=True):
 
     return data_ranges,parameters
 
-def etaPID(station,region,chamber,layer):
-    region*(100*chamber+10*layer+etaP)
-    pass
+def getEtaPID(station,region,chamber,layer,etaP):
+    # |------|-----|--|---|-|
+    # chamber | etaP | station | layer | region 
+    region = 0 if region == 1 else 1
 
+    as_string = f'{chamber:06b}' + f'{etaP:05b}' + f'{station:02b}' + f'{layer:03b}' + f'{region:01b}' 
+    return int(as_string,2)
+
+def convert_etaPID(etaPID):
+    etaPID_asString = f'{etaPID:017b}'
+    chamber = int(etaPID_asString[0:6],2)
+    eta_partition = int(etaPID_asString[6:11],2)
+    station = int(etaPID_asString[11:13],2)
+    layer = int(etaPID_asString[13:16],2)
+    region = int(etaPID_asString[16:17],2)
+    
+    region = 1 if region == 0 else -1
+    return station,region,chamber,layer,eta_partition
+    
 
 def getInfoFromEtaID(id):
     etaPartition = abs(id)%10
@@ -336,7 +351,7 @@ def VFATOFFHisto(VFATOFF_dictionary):
             VFAT_OFFTH2D[key_1][key_2].SetMinimum(0)
 
     for key, value in VFATOFF_dictionary.items():
-        region,chamber,layer,etaPartition = getInfoFromEtaID(key)
+        station,region,chamber,layer,etaPartition = convert_etaPID(key)
         for VFATN in value:
             VFAT_OFFTH2D[region][layer].Fill(chamber,VFATN)
     
@@ -437,7 +452,7 @@ def incidenceAngle_vs_Eff(sourceDict,input_region=1,input_layer=1):
         etaPartitionRecHits = 0
         etaPartitionPropHits = 0
         for etaPartitionID,value in sourceDict.items():
-            region,chamber,layer,eta = getInfoFromEtaID(etaPartitionID)
+            station,region,chamber,layer,eta = convert_etaPID(etaPartitionID)
             
             if layer not in input_layer or region not in input_region:
                 continue
@@ -667,8 +682,8 @@ def passCut(PropHitonEta,etaPID,prop_hit_index,maxPropR_Err=0.7,maxPropPhi_Err=0
         passedCut = -6
 
     
-    PhiMin = boundaries[etaPID][1]
-    PhiMax = boundaries[etaPID][0]
+    PhiMin = boundariesGE11[etaPID][1]
+    PhiMax = boundariesGE11[etaPID][0]
     PropHitPhi = PropHitonEta['glb_phi'][prop_hit_index]
     PropHitPt = PropHitonEta['pt'][prop_hit_index]
 
@@ -692,8 +707,8 @@ def passCut(PropHitonEta,etaPID,prop_hit_index,maxPropR_Err=0.7,maxPropPhi_Err=0
 
     ## Fiducial cut on etaP perimeter
     ## check it does not exceed rmax
-    rMax = boundaries[etaPID][2]
-    rMin = boundaries[etaPID][3]
+    rMax = boundariesGE11[etaPID][2]
+    rMin = boundariesGE11[etaPID][3]
     if PropHitonEta['glb_r'][prop_hit_index] > (rMax-fiducialCutR):
         passedCut = -3
     if PropHitonEta['glb_r'][prop_hit_index] < (rMin+fiducialCutR):
@@ -746,7 +761,7 @@ def generateEfficiencyPlotbyEta(sourceDict,input_region=1,input_layer=1):
         TH1F_TempContainer.setdefault(chambers,{'num':ROOT.TH1F('num_'+chambers+title, title,8,0.5,8.5),'den':ROOT.TH1F('den_'+chambers+title, title,8,0.5,8.5)})
 
     for etaPartitionID in sourceDict.keys():
-        region,chamber,layer,eta = getInfoFromEtaID(etaPartitionID)
+        station,region,chamber,layer,eta = convert_etaPID(etaPartitionID)
     
         if layer not in input_layer or region not in  input_region:
             continue
@@ -1019,8 +1034,8 @@ def generateEfficiencyPlotbyPt(sourceDict,input_region=[-1,1],input_layer=[1,2])
         TH1F_TempContainer['All']['num'].SetBinContent(pt+1, TH1F_TempContainer['All']['num'].GetBinContent(pt) + sum([sourceDict[etaPartitionID][pt]['num'] for etaPartitionID in sourceDict.keys()]))
         TH1F_TempContainer['All']['den'].SetBinContent(pt+1, TH1F_TempContainer['All']['den'].GetBinContent(pt) + sum([sourceDict[etaPartitionID][pt]['den'] for etaPartitionID in sourceDict.keys()]))
         
-        long_chambers_etaPartitionID = [etaPartitionID for etaPartitionID in sourceDict.keys() if getInfoFromEtaID(etaPartitionID)[1] % 2 == 0]
-        short_chambers_etaPartitionID = [etaPartitionID for etaPartitionID in sourceDict.keys() if getInfoFromEtaID(etaPartitionID)[1] % 2 == 1]
+        long_chambers_etaPartitionID = [etaPartitionID for etaPartitionID in sourceDict.keys() if convert_etaPID(etaPartitionID)[0] % 2 == 0]
+        short_chambers_etaPartitionID = [etaPartitionID for etaPartitionID in sourceDict.keys() if convert_etaPID(etaPartitionID)[0] % 2 == 1]
         
         TH1F_TempContainer['Long']['num'].SetBinContent(pt+1, TH1F_TempContainer['Long']['num'].GetBinContent(pt) + sum([sourceDict[etaPartitionID][pt]['num'] for etaPartitionID in long_chambers_etaPartitionID]))
         TH1F_TempContainer['Long']['den'].SetBinContent(pt+1, TH1F_TempContainer['Long']['den'].GetBinContent(pt) + sum([sourceDict[etaPartitionID][pt]['den'] for etaPartitionID in long_chambers_etaPartitionID]))
@@ -1052,7 +1067,7 @@ def generateEfficiencyDistribution(sourceDict):
                 Eff[key] = -9
 
     for etaPartitionID,value in sourceDict.items():
-        region,chamber,layer,eta = getInfoFromEtaID(etaPartitionID)
+        station,region,chamber,layer,eta = convert_etaPID(etaPartitionID)
 
         key = region*(100*chamber+10*layer)
 
@@ -1118,7 +1133,7 @@ def generateEfficiencyPlot2DGE11(sourceDict,input_region=1,input_layer=1,debug=F
     
     N = 1                                                                        
     for etaPartitionID,value in sourceDict.items():
-        region,chamber,layer,eta = getInfoFromEtaID(etaPartitionID)
+        station,region,chamber,layer,eta = convert_etaPID(etaPartitionID)
         
         if layer not in input_layer or region not in input_region:
             continue
@@ -1420,10 +1435,6 @@ def VFATEfficiencyFromCSV(df):
                 print(Name+"\t"+str(VFATN)+"\t"+str(matched/prop))
 
 if __name__ == '__main__':
-    for ch in ["GE11-M-02L1-L","GE11-M-02L2-L"]:
-        print(ch)
-        print("HV\tMatched\tPropagated\tCL68_Eff")
-        print(generateClopperPeasrsonInterval(50,60))
     # df = pd.read_csv("/afs/cern.ch/user/f/fivone/Test/Analyzer/Output/PFA_Analyzer_Output/CSV/357333_Express/MatchingSummary_glb_phi_byVFAT.csv")
     # VFATEfficiencyFromCSV(df)
     pass

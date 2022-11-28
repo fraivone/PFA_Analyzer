@@ -276,7 +276,7 @@ for chain_index,evt in enumerate(chain):
         chamber = evt.gemRecHit_chamber[RecHit_index]
         layer = evt.gemRecHit_layer[RecHit_index]
         etaP = evt.gemRecHit_etaPartition[RecHit_index]
-        RecHitEtaPartitionID =  region*(100*chamber+10*layer+etaP)
+        RecHitEtaPartitionID =  getEtaPID(station,region,chamber,layer,etaP)
         endcapKey = EndcapLayer2label(region,layer)
         chamberID = getChamberName(region,chamber,layer,station)
 
@@ -341,7 +341,7 @@ for chain_index,evt in enumerate(chain):
         layer = evt.mu_propagated_layer[PropHit_index]
         etaP = evt.mu_propagated_etaP[PropHit_index]
         chamberID = getChamberName(region,chamber,layer)
-        PropHitChamberID = region*(100*chamber+10*layer+etaP)
+        PropHitChamberID = getEtaPID(station,region,chamber,layer,etaP)
         endcapKey = EndcapLayer2label(region,layer)
         outermost_z = evt.mu_propagated_Outermost_z[PropHit_index]
 
@@ -422,8 +422,8 @@ for chain_index,evt in enumerate(chain):
     ##      1.SAME REGION,SC,LAYER,ETA -->SAME etaPartitionID
     ##      When using DLE, only evts w/ exactly 2 PropHit in a SC: 1 hit per Layer with Delta(etaP) < 4
 
-    if parameters["DLE"] and (len(PropHit_Dict.keys()) != 2 or abs(PropHit_Dict.keys()[0] - PropHit_Dict.keys()[1] ) > 13) :
-        continue
+    # if parameters["DLE"] and (len(PropHit_Dict.keys()) != 2 or abs(PropHit_Dict.keys()[0] - PropHit_Dict.keys()[1] ) > 13) :
+    #     continue
 
     layer1Match = False
     layer2Match = False
@@ -436,7 +436,7 @@ for chain_index,evt in enumerate(chain):
 
     for etaPartitionID in PropHit_Dict.keys():
         
-        region,chamber,layer,eta = getInfoFromEtaID(etaPartitionID)
+        station,region,chamber,layer,eta = convert_etaPID(etaPartitionID)
         endcapTag = EndcapLayer2label(region,layer)
         current_chamber_ID = getChamberName(region,chamber,layer)
         
@@ -992,7 +992,7 @@ for matchingVar in matching_variables:
     tempList_byVFAT = []
     tempList_byDLE = []
     for etaPID,subDict in EfficiencyDictGlobal[matchingVar].items():
-        region,chamber,layer,eta = getInfoFromEtaID(etaPID)
+        station,region,chamber,layer,eta = convert_etaPID(etaPID)
         
         matchedRecHit = sum([subDict[k]['num'] for k in subDict.keys()])
         propHit = sum([subDict[k]['den'] for k in subDict.keys()])
@@ -1015,7 +1015,7 @@ for matchingVar in matching_variables:
     data_byVFAT.to_csv(OUTPUT_PATH + '/PFA_Analyzer_Output/CSV/'+parameters["outputname"]+'/MatchingSummary_'+matchingVar+'_byVFAT.csv', index=False)
 if parameters["DLE"]:
     for etaPID,subDict in EfficiencyDictLayer['glb_rdphi'].items():
-        region,chamber,layer,eta = getInfoFromEtaID(etaPID)
+        station,region,chamber,layer,eta = convert_etaPID(etaPID)
 
         matchedRecHit = sum([subDict[k]['num'] for k in subDict.keys()])
         propHit = sum([subDict[k]['den'] for k in subDict.keys()])
