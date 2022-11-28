@@ -2,16 +2,23 @@ import ROOT
 import argparse
 import sys
 from argparse import RawTextHelpFormatter
-from scipy.special import erf
-from scipy.optimize import curve_fit
 import pandas as pd
 from ROOT_Utils import *
 from PFA_Analyzer_Utils import *
 import array
 import numpy as np
 import TDR_Approval_Style
- 
-fa1 = ROOT.TF1("erf(x)","[2] + [2]*ROOT::Math::erf((x-[0])/(sqrt(2)*[1]))",0,700)
+
+ver=""
+
+if ver=="":
+    hv_scan_output = "/eos/user/f/fivone/www/P5_Operations/Run3/RunMerge/HVScan/"
+    fa1 = ROOT.TF1("erf(x)","[2] + [2]*ROOT::Math::erf((x-[0])/(sqrt(2)*[1]))",0,700)
+    
+if ver == "rev1":
+    hv_scan_output = "/eos/user/f/fivone/www/P5_Operations/Run3/RunMerge/HVScan_rev1/"
+    fa1 = ROOT.TF1("erf(x)","2*[2]/(1 + exp( -(x-[0])/[1]  ) )",0,700)
+
 fa1.SetParNames("Mean","Sigma","Norm")
 fa1.SetParameters(650,30,50)
 fa1.SetLineColor(ROOT.kBlue)
@@ -195,9 +202,13 @@ for re in [-1,1]:
             latex.SetTextSize(0.3*ROOT.gPad.GetTopMargin())
             latex.DrawLatex(1.1*ROOT.gPad.GetLeftMargin(),1 - 1.2*c2.GetTopMargin(), "#chi^{2}: "+f"{chi2:1.3f}")
             latex.DrawLatex(1.1*ROOT.gPad.GetLeftMargin(), 1 - 1.6*c2.GetTopMargin(), f"Mean: {mean:3.2f} uA")
-            latex.DrawLatex(1.1*ROOT.gPad.GetLeftMargin(), 1 - 2*c2.GetTopMargin(), f"Std Dev: {sigma:2.2f}")
             latex.DrawLatex(1.1*ROOT.gPad.GetLeftMargin(), 1 - 2.4*c2.GetTopMargin(), f"Norm: {2*norm:2.2f}")
-            
+            if ver=="":
+                latex.DrawLatex(1.1*ROOT.gPad.GetLeftMargin(), 1 - 2.8*c2.GetTopMargin(), f"Slope: {np.sqrt(2/np.pi) * norm /(sigma):2.2f}")
+                latex.DrawLatex(1.1*ROOT.gPad.GetLeftMargin(), 1 - 2*c2.GetTopMargin(), f"Sigma: {sigma:2.2f}")
+            if ver=="rev1":
+                latex.DrawLatex(1.1*ROOT.gPad.GetLeftMargin(), 1 - 2.8*c2.GetTopMargin(), f"Slope: {norm /(2*sigma):2.2f}")
+                latex.DrawLatex(1.1*ROOT.gPad.GetLeftMargin(), 1 - 2*c2.GetTopMargin(), f"Lambda: {1/sigma:2.4f}")
             
         
             ## Right aligned
@@ -211,29 +222,29 @@ for re in [-1,1]:
             c2.Update()
 
             ## Output files
-            folder_name = "/eos/user/f/fivone/www/P5_Operations/Run3/RunMerge/HVScan_rev1/"+label
+            folder_name = hv_scan_output+label
             CreatEOSFolder(folder_name)
             outputPath = folder_name+"/"+chamberID +".pdf"
             c2.SaveAs(outputPath)
             Convert2png(outputPath)
 
 
-file_name = "/eos/user/f/fivone/www/P5_Operations/Run3/RunMerge/HVScan_rev1/HVOnsetDistribution.pdf"
+file_name = hv_scan_output+"HVOnsetDistribution.pdf"
 TH1_OnsetDistr.Draw("HIST")
 c2.SaveAs(file_name)
 Convert2png(file_name)
 
-file_name = "/eos/user/f/fivone/www/P5_Operations/Run3/RunMerge/HVScan_rev1/chi2Distribution.pdf"
+file_name = hv_scan_output+"chi2Distribution.pdf"
 TH1_chi2Distr.Draw("HIST")
 c2.SaveAs(file_name)
 Convert2png(file_name)
 
-file_name = "/eos/user/f/fivone/www/P5_Operations/Run3/RunMerge/HVScan_rev1/sigmaDistribution.pdf"
+file_name = hv_scan_output+"sigmaDistribution.pdf"
 TH1_sigmaDistr.Draw("HIST")
 c2.SaveAs(file_name)
 Convert2png(file_name)
 
-file_name = "/eos/user/f/fivone/www/P5_Operations/Run3/RunMerge/HVScan_rev1/normDistribution.pdf"
+file_name = hv_scan_output+"normDistribution.pdf"
 TH1_normDistr.Draw("HIST")
 c2.SaveAs(file_name)
 Convert2png(file_name)
@@ -311,6 +322,6 @@ Convert2png(file_name)
 # c2.Update()
 
 
-# file_name = "/eos/user/f/fivone/www/P5_Operations/Run3/RunMerge/HVScan/ForPiet.pdf"
+# file_name = hv_scan_output + "ForPiet/EffCurve.pdf"
 # c2.SaveAs(file_name)
 # Convert2png(file_name)
