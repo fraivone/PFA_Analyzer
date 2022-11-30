@@ -593,7 +593,7 @@ def unpackVFATStatus(evt,VFATMaskBook):
         endcapTag = EndcapLayer2label(region,layer)
         VFATsMasked = whichBitsAreFalse(evt.gemOHStatus_VFATMasked[k])
         error = evt.gemOHStatus_errors[k]
-        warning = ord(evt.gemOHStatuswarnings[k])
+        warning = ord(evt.gemOHStatus_warnings[k])
         chamberID = getChamberName(region,chamber,layer,station)
 
         # if error or warning, mask the entire chamber
