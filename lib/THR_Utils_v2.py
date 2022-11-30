@@ -19,13 +19,14 @@ mapping = {v: k for k, v in mapping.items()}
 ## 
 def GetCHDict(chamber_ID,run=348832):
         tupl = mapping[chamber_ID]
+        print(tupl)
         crate = int(tupl[0])
         amc = int(tupl[1])
         OHLink = int(tupl[2])
         fed = 1466 + crate
         
-        #file_path = "/afs/cern.ch/user/f/fivone/Test/runParameterGEM/run"+str(run)+"/fed%d" % fed + "-amc%02d" % amc +"_ConfigInfo.json"
-        file_path = "/eos/cms/store/group/dpg_gem/comm_gem/P5_Commissioning/2022/config/global/THR_Latency/run"+str(run)+"/fed%d" % fed + "-amc%02d" % amc +"_ConfigInfo.json"
+        file_path = "/afs/cern.ch/user/f/fivone/Test/runParameterGEM/run"+str(run)+"/fed%d" % fed + "-amc%02d" % amc +"_ConfigInfo.json"
+        #file_path = "/eos/cms/store/group/dpg_gem/comm_gem/P5_Commissioning/2022/config/global/THR_Latency/run"+str(run)+"/fed%d" % fed + "-amc%02d" % amc +"_ConfigInfo.json"
 
         try:
                 with open(file_path) as json_file:
@@ -103,5 +104,7 @@ def GetOverallChamberThreshold(chamberID,run=357329):
         
 
 if __name__ == "__main__":
+        for k in range(0,24):
+                print(f'{k} {GetVFAT_THRDAC("GE11-M-25L1-S",k,361917)}')
         pass
 
